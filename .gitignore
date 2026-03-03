@@ -1,0 +1,47 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Python cache/build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+ls-venv/
+
+# ML/data artifacts
+data/
+models/
+outputs/
+runs/
+wandb/
+mlruns/
+checkpoints/
+
+# Local temp/cache folders
+temppip-cache/
+tmp/
+temp/
+
+# Editor/OS noise
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
