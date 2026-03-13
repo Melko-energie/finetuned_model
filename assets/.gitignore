@@ -1,0 +1,27 @@
+cd C:\Users\melko\Developer\finetuned_model
+```
+
+Crée le fichier `.gitignore` avec ce contenu :
+```
+# Modèle (trop lourd pour GitHub)
+models/
+data/formatted_dataset/
+
+# Images et PDFs (données sensibles + lourdes)
+data/raw_pdfs/
+data/page_images/
+data/pdfs_flat/
+data/images_flat/
+
+# Environnement Python
+venv/
+__pycache__/
+*.pyc
+*.pth
+
+# Outputs
+outputs/
+
+# Cache
+.cache/
+*.log
