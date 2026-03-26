@@ -7,7 +7,7 @@ from tqdm import tqdm
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-PDF_DIR = "../data/raw_pdfs"
+PDF_DIR = "../data/raw_pdfs/nvins"
 OUTPUT_DIR = "../data/page_images"
 DPI = 200
 
