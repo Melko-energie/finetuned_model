@@ -1,250 +1,146 @@
-Voici un fichier README.md complet, en **français**, clair, structuré et prêt à l’emploi pour votre projet **d’extraction d’informations dans des documents avec LayoutLMv3 et LoRA**.
+# Extraction de Factures BTP — Gemma2:9b + OCR DocTR
+
+Extraction automatique de champs depuis des factures BTP francaises via **Gemma2:9b** (Ollama) et **OCR DocTR**.
+
+Interface Streamlit avec 2 modes :
+- **Gemma2 Texte** : prompt generique sur le texte OCR
+- **Gemma2 Smart** : detection automatique du fournisseur + prompt specialise
 
 ---
 
-# 📄 Extraction d’informations dans des documents avec LayoutLMv3
+## Champs extraits
 
-Un modèle **LayoutLMv3** fine-tuné avec **LoRA** (Low-Rank Adaptation) pour l’extraction automatique et structurée d’informations dans des documents (PDF, images, etc.).
+| Champ | Description |
+|---|---|
+| NUMERO_FACTURE | Numero complet de la facture |
+| DATE_FACTURE | Date d'emission (JJ/MM/AAAA) |
+| MONTANT_HT | Montant hors taxes |
+| TAUX_TVA | Taux de TVA (5.5%, 10%, 20%) |
+| MONTANT_TTC | Montant TTC / Net a payer |
+| NOM_INSTALLATEUR | Entreprise emettrice |
+| COMMUNE_TRAVAUX | Ville du chantier |
+| CODE_POSTAL | Code postal du chantier |
+| ADRESSE_TRAVAUX | Adresse complete du chantier |
 
 ---
 
-## 📁 Structure du projet
+## Structure du projet
 
 ```
 finetuned_model/
-├── data/                        # Données brutes et annotées
-├── scripts/                     # Scripts de traitement
-├── models/                      # Modèles préentraînés et fine-tunés
-├── outputs/                     # Résultats (logs, prédictions, exports)
-├── notebooks/                   # Notebooks d’exploration
-├── configs/                     # Fichiers de configuration
-└── requirements.txt             # Dépendances Python
+├── app.py                      # Interface Streamlit (2 onglets)
+├── context.md                  # Documentation projet
+├── requirements.txt
+├── assets/logo.png
+├── scripts/
+│   ├── 00_pdf_to_images.py     # PDF → PNG (convention _page0)
+│   ├── 01_ocr_extraction.py    # DocTR OCR → JSON
+│   └── 12_gemma2_smart.py      # Extraction smart par fournisseur
+└── data/
+    ├── raw_pdfs/               # PDFs source (17 fournisseurs)
+    ├── page_images/            # PNG generes par script 00
+    └── ocr_texts/              # JSON OCR DocTR par fournisseur
 ```
 
 ---
 
-## 🚀 Démarrage rapide
+## Demarrage rapide
 
 ### 1. Installation
 
 ```bash
-# Cloner le dépôt
-git clone <your-repo>
+git clone https://github.com/Melko-energie/finetuned_model.git
 cd finetuned_model
-
-# Installer les dépendances Python
 pip install -r requirements.txt
-
-# Installer Tesseract (OCR)
-# Ubuntu/Debian :
-sudo apt-get install tesseract-ocr
-
-# macOS :
-brew install tesseract
 ```
 
----
+Prerequis : **Ollama** avec le modele `gemma2:9b` :
+```bash
+ollama pull gemma2:9b
+```
 
-### 2. Préparation des données
-
-Placez vos **PDFs** dans `data/raw_pdfs/`, puis exécutez la pipeline :
+### 2. Pipeline OCR (pour nouvelles factures)
 
 ```bash
-# 1. Extraction OCR
+# Mettre les PDFs dans data/raw_pdfs/{fournisseur}/
+
+# 1. PDF → Images PNG
+python scripts/00_pdf_to_images.py
+
+# 2. Images → OCR JSON
 python scripts/01_ocr_extraction.py
-
-# 2. Annotation automatique (regex)
-python scripts/02_auto_labeling.py
-
-# 3. Nettoyage des labels
-python scripts/03_label_cleaner.py
-
-# 4. Construction du dataset
-python scripts/04_dataset_builder.py
 ```
 
----
-
-### 3. Entraînement
+### 3. Interface Streamlit
 
 ```bash
-# Lancer l’entraînement
-python scripts/05_train_model.py
-
-# (Optionnel) Activer Weights & Biases
-wandb login
+streamlit run app.py
 ```
 
----
-
-### 4. Inférence
+### 4. Extraction en ligne de commande
 
 ```bash
-# Extraire les informations d’un nouveau document
-python scripts/06_inference.py chemin/vers/document.pdf
+python scripts/12_gemma2_smart.py
 ```
 
 ---
 
-## ⚙️ Configuration
+## Fournisseurs supportes (25 profils)
 
-### Schéma des labels
+### Fournisseurs principaux (17)
 
-Modifier `data/label_schema.json` pour définir vos propres entités :
+| Fournisseur | TVA | Particularite |
+|---|---|---|
+| A2M | 5.5% | Electricien RGE, renovation energetique |
+| ARCANA | 20% | Architecture, note d'honoraires |
+| CAILLOCE | 20% | Avocat, facturation horaire |
+| DILA | 20% | Titre de perception (gouvernement) |
+| ECO2E | 20% | Bureau d'etudes fluides |
+| ESTEVE | 20% | Electricite |
+| EXIM | 20% | Diagnostics amiante (ATHOS) |
+| GAZETTE | 20% | Annonces legales |
+| GIGABAT | 20% | Coordination SPS |
+| HESTIA | 10% | Bureau d'etudes habitat |
+| KELVIN | 20% | Etudes thermiques |
+| OREA | 20% | Maitrise d'oeuvre |
+| POULAIN | 20% | Bureau d'etudes thermiques |
+| RCPI | 20% | Maitrise d'oeuvre batiment |
+| SOCOTEC | 20% | Controle technique |
+| TERNEL | 20% + 5.5% | Couverture/charpente, TVA mixte |
 
-- Ajouter/supprimer des champs
-- Mettre à jour les expressions régulières dans `02_auto_labeling.py`
+### Sous-installateurs NVINS (8 auto-facturations SIP)
 
-### Paramètres d’entraînement
-
-Modifier `configs/training_args.json` :
-
-- Taux d’apprentissage
-- Taille des batchs
-- Nombre d’époques
-- Paramètres LoRA (rank, alpha, etc.)
-
----
-
-## 🧠 Architecture
-
-- **Modèle de base** : LayoutLMv3-base
-- **Méthode de fine-tuning** : LoRA (PEFT)
-- **Tâche** : Classification de tokens (NER)
-- **Entrées** : Images de pages + texte + layout (bounding boxes)
-
----
-
-## 🧾 Champs supportés (exemples)
-
-| Champ        | Description                          |
-|--------------|--------------------------------------|
-| ACCISSE      | Numéros d’identification fiscale     |
-| DATE         | Dates (formats variés)               |
-| NOM          | Noms de famille                      |
-| PRENOM       | Prénoms                              |
-| ADRESSE      | Adresses postales                    |
-| MONTANT      | Montants monétaires                  |
-| DESIGNATION  | Libellés d’articles                  |
-| REFERENCE    | Références de documents              |
+| Installateur | Prefixe | Metier |
+|---|---|---|
+| KLISZ | 8DE- | Peinture/finitions |
+| PROXISERVE | 8PR- | Plomberie/chauffage (TVA 5.5%) |
+| LOGISTA | 8LO- | Plomberie/chauffage |
+| L'UNION DES PEINTRES | 8UN- | Peinture (SCOP) |
+| SAS APPLI | 8AP- | Peinture |
+| TECHSOL | 8TH- | Revetements de sols |
+| NUMERISS | 8NU- | Electricite |
+| SIP AMIENS | — | Fallback generique |
 
 ---
 
-## 📊 Performances (exemples)
+## Environnement technique
 
-| Métrique   | Plage typique |
-|------------|---------------|
-| F1-score   | 85 – 95 %     |
-| Précision  | 82 – 93 %     |
-| Rappel     | 84 – 94 %     |
-
-> Les performances dépendent de la **qualité des données** et de la **cohérence des annotations**.
-
----
-
-## 🛠️ Personnalisation
-
-### Ajouter un nouveau champ
-
-1. Ajouter le label dans `label_schema.json`
-2. Ajouter une règle regex dans `02_auto_labeling.py`
-3. Ajouter une règle de normalisation dans `03_label_cleaner.py`
-4. Relancer l’entraînement
-
-### Améliorer l’OCR
-
-- Modifier la **résolution DPI** dans `01_ocr_extraction.py`
-- Changer de moteur OCR (Tesseract, PyMuPDF, etc.)
-- Prétraiter les images (débruitage, accentuation)
+- **OS** : Windows 11
+- **Python** : 3.11+
+- **OCR** : DocTR
+- **LLM** : Gemma2:9b via Ollama
+- **Interface** : Streamlit
+- **GPU** : NVIDIA RTX 5080 Laptop (15.9 GB VRAM)
 
 ---
 
-## 🔧 Résolution des problèmes courants
+## Contraintes techniques
 
-| Problème               | Solution rapide                                      |
-|------------------------|------------------------------------------------------|
-| OCR peu précis         | Augmenter la DPI, changer de moteur, prétraiter      |
-| Modèle peu performant  | Ajouter des données, ajuster les poids de classe     |
-| Problèmes de mémoire   | Réduire le batch size, activer fp16, gradient accumulation |
-
----
-
-## 📄 Licence
-
-MIT – voir le fichier `LICENSE`.
+- `options={"temperature": 0, "seed": 42}` sur **chaque** appel Ollama
+- Reponse JSON uniquement, nettoyage des balises markdown
+- OCR DocTR : acces via `data["pages"][idx]` = liste de tokens (jamais blocks/lines/words)
+- Convention nommage images : `_page0`, `_page1` (commence a 0)
 
 ---
 
-## 📣 Citation
-
-Si vous utilisez ce projet dans vos travaux :
-
-```bibtex
-@software{layoutlmv3_finetuning,
-  title  = {Extraction d'informations dans des documents avec LayoutLMv3 et LoRA},
-  author = {Votre Nom},
-  year   = {2024},
-  url    = {https://github.com/yourusername/finetuned_model}
-}
-```
-
----
-
-## ✅ Étapes suivantes
-
-1. **Ajouter 5 à 10 PDFs d’exemple** dans `data/raw_pdfs/`
-2. **Lancer la pipeline complète** :
-   ```bash
-   python scripts/01_ocr_extraction.py
-   python scripts/02_auto_labeling.py
-   python scripts/03_label_cleaner.py
-   python scripts/04_dataset_builder.py
-   ```
-3. **Vérifier les annotations** dans `data/annotations_cleaned/` et corriger si besoin
-4. **Entraîner le modèle** :
-   ```bash
-   python scripts/05_train_model.py
-   ```
-5. **Tester sur un nouveau document** :
-   ```bash
-   python scripts/06_inference.py data/raw_pdfs/test.pdf
-   ```
-
----
-
-## 🧩 Arborescence complète
-
-```
-finetuned_model/
-├── data/
-│   ├── raw_pdfs/                # PDFs originaux
-│   ├── ocr_texts/               # Résultats OCR (texte + bbox)
-│   ├── annotations/             # Annotations (format Label Studio)
-│   ├── formatted_dataset/       # Dataset tokenisé prêt pour le training
-│   └── label_schema.json        # Définition des champs
-├── scripts/
-│   ├── 01_ocr_extraction.py     # OCR avec Tesseract
-│   ├── 02_auto_labeling.py      # Annotation automatique
-│   ├── 03_label_cleaner.py      # Nettoyage des labels
-│   ├── 04_dataset_builder.py    # Conversion vers HuggingFace dataset
-│   ├── 05_train_model.py        # Entraînement avec LoRA
-│   └── 06_inference.py          # Inférence sur nouveau document
-├── models/
-│   ├── layoutlmv3-base/         # Modèle préentraîné
-│   └── finetuned_lora/          # Vos checkpoints
-├── outputs/
-│   ├── logs/                    # Logs et métriques
-│   ├── predictions/             # Prédictions brutes
-│   └── exported/                # JSON/Excel finaux
-├── notebooks/
-│   └── eda_dataset_explore.ipynb
-├── configs/
-│   └── training_args.json
-├── requirements.txt
-└── README.md
-```
-
----
-
-**Le projet est prêt à l’emploi.**  
-Vous pouvez maintenant personnaliser le schéma de labels, ajouter vos propres PDFs, et entraîner votre modèle d’extraction intelligente !
+Stage 2026 — MADANI Yassine | Melko Energie
