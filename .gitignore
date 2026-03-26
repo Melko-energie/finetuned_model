@@ -24,19 +24,13 @@ dist/
 # Virtual environments
 .venv/
 venv/
-ls-venv/
 
-# ML/data artifacts
-data/
-models/
-outputs/
-runs/
-wandb/
-mlruns/
-checkpoints/
+# Data (PDFs, images, OCR trop volumineux pour git)
+data/raw_pdfs/
+data/page_images/
+data/ocr_texts/
 
 # Local temp/cache folders
-temppip-cache/
 tmp/
 temp/
 
