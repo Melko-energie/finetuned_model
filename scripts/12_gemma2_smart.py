@@ -433,7 +433,7 @@ PARTICULARITÉS POULAIN :
 - Document intitulé "DEMANDE D'HONORAIRES"
 - Numéro format "2129 - 702" (séquence - sous-numéro)
 - TVA : 20%
-- Montants : tableau de phases (DIAG/PLAN/ET) avec avancement. Cherche "CHT", "TVA", "CTTC" ou "Taux de TVA: 20%"
+- Montants : tableau de phases (DIAG/PLAN/ET) avec avancement. Cherche "€ HT", "TVA", "€ TTC" ou "Taux de TVA: 20%"
 - MONTANT_HT : prendre UNIQUEMENT le dernier Total HT affiché. Ignorer acomptes et sous-totaux.
 - Installateur : B.E.T. PHILIPPE POULAIN, 123 boulevard de Strasbourg, 80000 AMIENS
 
@@ -490,6 +490,7 @@ PARTICULARITÉS TERNEL :
 - TVA MIXTE : peut avoir 20% ET 5,5% sur la même facture. Indique les deux taux séparés par "/"
 - Montants : récapitulatif en bas. Cherche "Total H.T.", "TVA1: 20%", "TVA2: 5,5%", "Total T.T.C.", "Net a payer"
 - MONTANT_HT : prendre UNIQUEMENT le dernier Total HT affiché. Ignorer acomptes et sous-totaux.
+- MONTANT_TTC : prendre UNIQUEMENT le dernier Total T.T.C affiché. Ignorer acomptes et sous-totaux.
 - Installateur : Ternel Couverture, 8 rue de l'industrie, 80300 ALBERT
 
 Extrais les champs suivants du texte OCR ci-dessous.
@@ -616,9 +617,38 @@ def get_ocr_text(pdf_path):
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Reconstruire le texte à partir de toutes les pages, trié par Y puis X
+    # Gestion multi-pages : page 0 + page avec le plus de mots-cles financiers
+    pages = data["pages"]
+    nb = len(pages)
+    MONTANT_KEYWORDS = ["ht", "tva", "ttc", "total", "net", "payer", "montant"]
+
+    if nb == 1:
+        pages_to_read = [(0, pages[0])]
+        print(f"  {pdf_name} : 1 page -> lecture page 0")
+    else:
+        # Scorer chaque page (sauf page 0) par nombre de mots-cles financiers
+        best_page = nb - 1
+        best_score = 0
+        for pi in range(1, nb):
+            words = [t.get("text", "").lower() for t in pages[pi]]
+            score = sum(1 for w in words for kw in MONTANT_KEYWORDS if kw in w)
+            if score > best_score or (score == best_score and pi > best_page):
+                best_score = score
+                best_page = pi
+
+        if best_score == 0:
+            print(f"  Page montants : aucun mot-cle trouve, fallback page {best_page} / {nb} pages")
+        else:
+            print(f"  Page montants : page {best_page} (score {best_score} mots-cles) / {nb} pages")
+
+        if best_page == 0:
+            pages_to_read = [(0, pages[0])]
+        else:
+            pages_to_read = [(0, pages[0]), (best_page, pages[best_page])]
+
+    # Reconstruire le texte à partir des pages sélectionnées, trié par Y puis X
     all_tokens = []
-    for page_idx, page_tokens in enumerate(data["pages"]):
+    for page_idx, page_tokens in pages_to_read:
         for token in page_tokens:
             bbox = token.get("bbox", [0, 0, 0, 0])
             all_tokens.append({
