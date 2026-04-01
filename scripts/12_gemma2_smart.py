@@ -450,10 +450,29 @@ TEXTE OCR :
         "prompt": f"""Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une facture de RCPI Maître d'Oeuvre Bâtiment (Beauvais).
 
 PARTICULARITÉS RCPI :
-- Numéro facture format "GL 027-01-22" (préfixe + séquence-mois-année). Avoir : "AGL 001-03-22"
+- Numéro facture format "GL XXX-XX-XX" (ex: "GL 027-01-22"). Le préfixe "GL" est OBLIGATOIRE. Avoir : "AGL 001-03-22"
 - TVA : 20%
-- Montants : tableau de missions avec avancement %. Cherche "TOTAL HT", "TVA 20%", "TOTAL TTC"
 - Installateur : RCPI (SARL), 1 rue de Pinconlieu, 60000 Beauvais
+
+MONTANT_HT :
+- Cherche UNIQUEMENT le montant à côté de "TOTAL HT" (pas "Sous-total")
+- PRIORITÉ : "TOTAL HT" > tout autre montant HT
+- IGNORER ABSOLUMENT : "Sous-total HT", "Sous-total HT/cumul", "Sous-total HT déjà facturé"
+- IGNORER : montants partiels, acomptes, avances, lignes de détail
+- Si "Sous-total HT/cumul" = 4500 et "TOTAL HT" = 2250, la réponse est 2250
+- Format : nombre seul sans € ni espaces (ex: "3409.00" pas "3 409,00 €")
+
+MONTANT_TTC :
+- Cherche "Net à payer", "TOTAL TTC", "Total TTC"
+- Le TTC doit toujours être SUPÉRIEUR au HT. Si le montant trouvé est inférieur au HT → mettre null
+- IGNORER "TOTAL TTC déjà facturé" et les restes à payer
+- Format : nombre seul sans € ni espaces
+
+VALIDATION OBLIGATOIRE :
+- MONTANT_TTC doit être = MONTANT_HT × (1 + TAUX_TVA/100)
+- Si TVA = 20% alors TTC = HT × 1.20
+- Si le calcul ne correspond pas, cherche d'autres valeurs dans le texte
+- Ne retourne jamais un TTC < HT
 
 Extrais les champs suivants du texte OCR ci-dessous.
 Si un champ n'est pas visible, mets null.
@@ -489,8 +508,8 @@ PARTICULARITÉS TERNEL :
 - Numéro facture : 8 chiffres (ex: "00002810")
 - TVA MIXTE : peut avoir 20% ET 5,5% sur la même facture. Indique les deux taux séparés par "/"
 - Montants : récapitulatif en bas. Cherche "Total H.T.", "TVA1: 20%", "TVA2: 5,5%", "Total T.T.C.", "Net a payer"
-- MONTANT_HT : prendre UNIQUEMENT le dernier Total HT affiché. Ignorer acomptes et sous-totaux.
-- MONTANT_TTC : prendre UNIQUEMENT le dernier Total T.T.C affiché. Ignorer acomptes et sous-totaux.
+- MONTANT_HT : prendre UNIQUEMENT le montant à côté de "Total H.T." ou "TOTAL HT". IGNORER "Sous-total", acomptes, cumuls.
+- MONTANT_TTC : prendre UNIQUEMENT le montant à côté de "Total T.T.C." ou "TOTAL TTC". IGNORER sous-totaux TTC.
 - Installateur : Ternel Couverture, 8 rue de l'industrie, 80300 ALBERT
 
 Extrais les champs suivants du texte OCR ci-dessous.
@@ -509,9 +528,9 @@ TEXTE OCR :
 RÈGLES GÉNÉRALES :
 - NUMERO_FACTURE : numéro complet après "N°", "Facture N°", "Réf", etc.
 - DATE_FACTURE : format JJ/MM/AAAA
-- MONTANT_HT : montant hors taxes. Cherche "Total HT", "Net HT", "Montant HT"
+- MONTANT_HT : montant à côté de "TOTAL HT", "Net HT", "Montant HT". IGNORER "Sous-total HT", "Sous-total HT/cumul", "Sous-total HT déjà facturé". TOUJOURS prendre le TOTAL, jamais un sous-total.
 - TAUX_TVA : pourcentage TVA (ex: "20%", "10%", "5.5%")
-- MONTANT_TTC : montant TTC. Cherche "Total TTC", "Net à payer"
+- MONTANT_TTC : montant à côté de "TOTAL TTC", "Net à payer". IGNORER les sous-totaux TTC. Le TTC doit être > HT.
 - NOM_INSTALLATEUR : entreprise qui ÉMET la facture (pas le client)
 - COMMUNE_TRAVAUX : ville du chantier
 - CODE_POSTAL : code postal 5 chiffres du chantier
@@ -655,14 +674,14 @@ def get_ocr_text(pdf_path):
                 "text": token["text"],
                 "y": bbox[1],  # position Y (haut du token)
                 "x": bbox[0],  # position X (gauche du token)
+                "x2": bbox[2],  # position X droite du token
                 "page": page_idx,
             })
 
-    # Trier par page, puis par Y (lignes), puis par X (colonnes)
     # Regrouper par lignes approximatives (tolérance Y de 5 pixels)
     all_tokens.sort(key=lambda t: (t["page"], t["y"], t["x"]))
 
-    lines = []
+    grouped_lines = []
     current_line = []
     current_y = -999
     current_page = -1
@@ -670,15 +689,34 @@ def get_ocr_text(pdf_path):
     for token in all_tokens:
         if token["page"] != current_page or abs(token["y"] - current_y) > 5:
             if current_line:
-                lines.append(" ".join(t["text"] for t in current_line))
+                grouped_lines.append(current_line)
             current_line = [token]
             current_y = token["y"]
             current_page = token["page"]
         else:
             current_line.append(token)
-
     if current_line:
-        lines.append(" ".join(t["text"] for t in current_line))
+        grouped_lines.append(current_line)
+
+    # Trier chaque ligne par X, puis fusionner les tokens numériques adjacents
+    lines = []
+    for line_tokens in grouped_lines:
+        line_tokens.sort(key=lambda t: t["x"])
+
+        fused = []
+        for token in line_tokens:
+            if fused:
+                prev = fused[-1]
+                prev_ends_digit = prev["text"][-1].isdigit()
+                cur_starts_num = token["text"][0].isdigit() or token["text"][0] in ",."
+                distance = token["x"] - prev["x2"]
+                if prev_ends_digit and cur_starts_num and abs(distance) < 20:
+                    prev["text"] = prev["text"] + token["text"]
+                    prev["x2"] = token["x2"]
+                    continue
+            fused.append(dict(token))
+
+        lines.append(" ".join(t["text"] for t in fused))
 
     texte = "\n".join(lines)
     print(f"  Texte reconstruit : {len(lines)} lignes, {len(texte)} caractères")
@@ -703,6 +741,51 @@ def clean_json(raw):
 # EXTRACTION VIA GEMMA2
 # ─────────────────────────────────────────
 
+def verifier_coherence_montants(result):
+    """
+    Vérifie mathématiquement : TTC = HT × (1 + TVA/100) ± 5%.
+    Ajoute '_a_verifier': ['MONTANT_HT', 'MONTANT_TTC'] si incohérent.
+    """
+    a_verifier = []
+
+    try:
+        ht_raw = result.get("MONTANT_HT")
+        ttc_raw = result.get("MONTANT_TTC")
+        tva_raw = result.get("TAUX_TVA")
+
+        if not ht_raw or not ttc_raw or not tva_raw:
+            return result
+
+        # Nettoyer les valeurs
+        ht = float(str(ht_raw).replace(",", ".").replace(" ", "").replace("€", ""))
+        ttc = float(str(ttc_raw).replace(",", ".").replace(" ", "").replace("€", ""))
+        tva_str = str(tva_raw).replace("%", "").replace(",", ".").strip()
+        tva = float(tva_str)
+
+        # Vérification TTC < HT
+        if ttc < ht:
+            a_verifier.extend(["MONTANT_HT", "MONTANT_TTC"])
+            print(f"  [!] INCOHERENCE : TTC ({ttc}) < HT ({ht})")
+
+        # Vérification TTC = HT × (1 + TVA/100) ± 5%
+        ttc_attendu = ht * (1 + tva / 100)
+        ecart = abs(ttc - ttc_attendu) / ttc_attendu if ttc_attendu > 0 else 1
+        if ecart > 0.05:
+            if "MONTANT_HT" not in a_verifier:
+                a_verifier.extend(["MONTANT_HT", "MONTANT_TTC"])
+            print(f"  [!] INCOHERENCE : TTC={ttc}, attendu={ttc_attendu:.2f} (ecart {ecart:.1%})")
+        else:
+            print(f"  [OK] Coherence OK : HT={ht} x {1 + tva/100} = {ttc_attendu:.2f} ~ TTC={ttc}")
+
+    except (ValueError, TypeError) as e:
+        print(f"  [!] Verification impossible : {e}")
+
+    if a_verifier:
+        result["_a_verifier"] = list(set(a_verifier))
+
+    return result
+
+
 def extraire_champs(texte, installateur):
     """Appelle Gemma2:9b avec le prompt spécialisé du fournisseur détecté."""
     config = PROMPTS_INSTALLATEURS.get(installateur, PROMPTS_INSTALLATEURS["DEFAULT"])
@@ -720,6 +803,7 @@ def extraire_champs(texte, installateur):
 
     try:
         result = json.loads(raw)
+        result = verifier_coherence_montants(result)
         return result
     except json.JSONDecodeError as e:
         print(f"  ERREUR JSON : {e}")

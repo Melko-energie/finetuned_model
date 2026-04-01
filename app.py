@@ -326,18 +326,37 @@ def export_excel_batch(results_list):
         val_fill_ok = PatternFill(start_color="E6F4EA", end_color="E6F4EA", fill_type="solid")
         val_fill_empty = PatternFill(start_color="FDE8E8", end_color="FDE8E8", fill_type="solid")
         val_fill_alt = PatternFill(start_color="F7F8FA", end_color="F7F8FA", fill_type="solid")
+        val_fill_warn = PatternFill(start_color="FFF3E0", end_color="FFF3E0", fill_type="solid")
+        val_font_warn = Font(name="Calibri", size=11, italic=True, color="E65100")
+
+        # Mapper label → clé pour identifier les champs à vérifier
+        label_to_key = {lbl: key for key, lbl in FIELDS_LEFT + FIELDS_RIGHT}
 
         for row_idx in range(4, 4 + len(results_list)):
+            res = results_list[row_idx - 4]
+            fields = res.get("fields") or {}
+            a_verifier = fields.get("_a_verifier", [])
+
             for col_idx in range(1, nb_cols + 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
                 cell.font = val_font
                 cell.alignment = Alignment(horizontal="center", vertical="center")
                 cell.border = thin_border
+
+                col_label = all_labels[col_idx - 1]
+                field_key = label_to_key.get(col_label, "")
+
                 if col_idx == 1:
                     # Colonne nom du PDF : fond alterné
                     cell.font = Font(name="Calibri", size=11, bold=True)
                     if (row_idx - 4) % 2 == 1:
                         cell.fill = val_fill_alt
+                elif field_key in a_verifier:
+                    # Champ incohérent → orange "à vérifier"
+                    cell.fill = val_fill_warn
+                    cell.font = val_font_warn
+                    if cell.value:
+                        cell.value = str(cell.value) + " (a verifier)"
                 elif not cell.value:
                     cell.fill = val_fill_empty
                     cell.value = "Non detecte"
@@ -407,24 +426,47 @@ def process_single_file(file_bytes, suffix, choix_fournisseur):
             for line in block.lines:
                 for word in line.words:
                     x0, y0 = word.geometry[0]
-                    all_tokens.append({"text": word.value, "y": y0 * h, "x": x0 * w, "page": pi})
+                    x1 = word.geometry[1][0]
+                    all_tokens.append({"text": word.value, "y": y0 * h, "x": x0 * w, "x2": x1 * w, "page": pi})
 
+    # Regrouper par lignes approximatives (tolérance Y de 5 pixels)
     all_tokens.sort(key=lambda t: (t["page"], t["y"], t["x"]))
-    lines = []
+
+    grouped_lines = []
     current_line = []
     current_y = -999
     current_page = -1
     for token in all_tokens:
         if token["page"] != current_page or abs(token["y"] - current_y) > 5:
             if current_line:
-                lines.append(" ".join(t["text"] for t in current_line))
+                grouped_lines.append(current_line)
             current_line = [token]
             current_y = token["y"]
             current_page = token["page"]
         else:
             current_line.append(token)
     if current_line:
-        lines.append(" ".join(t["text"] for t in current_line))
+        grouped_lines.append(current_line)
+
+    # Trier chaque ligne par X, puis fusionner les tokens numériques adjacents
+    lines = []
+    for line_tokens in grouped_lines:
+        line_tokens.sort(key=lambda t: t["x"])
+
+        fused = []
+        for token in line_tokens:
+            if fused:
+                prev = fused[-1]
+                prev_ends_digit = prev["text"][-1].isdigit()
+                cur_starts_num = token["text"][0].isdigit() or token["text"][0] in ",."
+                distance = token["x"] - prev["x2"]
+                if prev_ends_digit and cur_starts_num and abs(distance) < 20:
+                    prev["text"] = prev["text"] + token["text"]
+                    prev["x2"] = token["x2"]
+                    continue
+            fused.append(dict(token))
+
+        lines.append(" ".join(t["text"] for t in fused))
 
     texte = "\n".join(lines)
     if not texte.strip():
@@ -1032,6 +1074,8 @@ def export_excel_multi_sheets(results_list):
     err_font = Font(name="Calibri", size=11, italic=True, color="C53030")
     err_fill = PatternFill(start_color="FDE8E8", end_color="FDE8E8", fill_type="solid")
     ok_fill = PatternFill(start_color="E6F4EA", end_color="E6F4EA", fill_type="solid")
+    warn_fill = PatternFill(start_color="FFF3E0", end_color="FFF3E0", fill_type="solid")
+    warn_font = Font(name="Calibri", size=11, italic=True, color="E65100")
     thin_border = Border(
         left=Side(style="thin", color="D1D5DB"),
         right=Side(style="thin", color="D1D5DB"),
@@ -1039,7 +1083,10 @@ def export_excel_multi_sheets(results_list):
         bottom=Side(style="thin", color="D1D5DB"),
     )
 
-    def style_sheet(ws, rows_data):
+    # Mapper colonne → clé pour les champs à vérifier
+    col_to_key = dict(zip(columns[1:], field_keys))
+
+    def style_sheet(ws, rows_data, items):
         # Titre
         ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(columns))
         title_cell = ws.cell(row=1, column=1, value=ws.title)
@@ -1058,12 +1105,25 @@ def export_excel_multi_sheets(results_list):
 
         # Valeurs
         for row_idx in range(4, 4 + len(rows_data)):
+            res = items[row_idx - 4]
+            fields = res.get("fields") or {}
+            a_verifier = fields.get("_a_verifier", [])
+
             for col_idx in range(1, len(columns) + 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
                 cell.border = thin_border
+
+                col_name = columns[col_idx - 1]
+                field_key = col_to_key.get(col_name, "")
+
                 if col_idx == 1:
                     cell.font = Font(name="Calibri", size=11, bold=True)
+                elif field_key in a_verifier:
+                    cell.fill = warn_fill
+                    cell.font = warn_font
+                    if cell.value:
+                        cell.value = str(cell.value) + " (a verifier)"
                 elif not cell.value:
                     cell.value = "Non detecte"
                     cell.font = err_font
@@ -1087,15 +1147,16 @@ def export_excel_multi_sheets(results_list):
         all_rows = build_rows(results_list)
         df_all = pd.DataFrame(all_rows, columns=columns)
         df_all.to_excel(writer, index=False, sheet_name="TOUTES_FACTURES", startrow=2)
-        style_sheet(writer.sheets["TOUTES_FACTURES"], all_rows)
+        style_sheet(writer.sheets["TOUTES_FACTURES"], all_rows, results_list)
 
         # Une feuille par installateur
         for inst_name in sorted(by_inst.keys()):
             sheet_name = inst_name[:31]  # Excel limite à 31 chars
-            inst_rows = build_rows(by_inst[inst_name])
+            inst_items = by_inst[inst_name]
+            inst_rows = build_rows(inst_items)
             df_inst = pd.DataFrame(inst_rows, columns=columns)
             df_inst.to_excel(writer, index=False, sheet_name=sheet_name, startrow=2)
-            style_sheet(writer.sheets[sheet_name], inst_rows)
+            style_sheet(writer.sheets[sheet_name], inst_rows, inst_items)
 
     return buf.getvalue()
 
