@@ -1,2 +1,160 @@
 {% extends "base.html" %}
-{% block content %}<p>Smart page</p>{% endblock %}
+{% block content %}
+<!-- Hidden file input -->
+<input type="file" id="upload-smart" accept=".pdf,.png,.jpg,.jpeg" class="hidden"/>
+
+<!-- Page Header -->
+<div class="flex justify-between items-end">
+    <div>
+        <span class="text-xs font-bold text-primary tracking-widest uppercase mb-1 block">Mode Intelligent</span>
+        <h2 class="font-manrope text-3xl font-extrabold text-on-background">Gemma2 Smart Extraction</h2>
+    </div>
+    <button id="btn-export-smart" class="bg-primary text-white px-6 py-2.5 rounded-md flex items-center gap-2 font-bold text-sm shadow-md hover:opacity-90 active:scale-95 transition-all">
+        <span class="material-symbols-outlined text-sm">download</span>
+        Exporter vers Excel
+    </button>
+</div>
+
+<!-- Loading Spinner -->
+<div id="loading-smart" class="hidden flex justify-center py-8">
+    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+</div>
+
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-12 gap-6">
+    <!-- Left Column: Upload & Preview -->
+    <div class="col-span-12 lg:col-span-5 space-y-6">
+        <!-- Upload Zone -->
+        <div onclick="document.getElementById('upload-smart').click()" class="bg-surface-container-high border-2 border-dashed border-outline-variant/30 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-primary-fixed transition-colors duration-300 group cursor-pointer">
+            <div class="w-16 h-16 rounded-full bg-white flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                <span class="material-symbols-outlined text-primary text-3xl">cloud_upload</span>
+            </div>
+            <p class="font-manrope font-bold text-on-surface">Glissez-déposez vos factures ici</p>
+            <p class="text-xs text-on-surface-variant mt-1">PDF, JPG, PNG supportés (Max 10MB)</p>
+        </div>
+        <!-- Document Preview -->
+        <div class="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm border border-outline-variant/10">
+            <div class="bg-surface-container-low px-4 py-2 flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Aperçu du document</span>
+                <div class="flex gap-2">
+                    <button class="p-1 hover:bg-white rounded"><span class="material-symbols-outlined text-sm">zoom_in</span></button>
+                    <button class="p-1 hover:bg-white rounded"><span class="material-symbols-outlined text-sm">open_in_full</span></button>
+                </div>
+            </div>
+            <div class="p-4 bg-slate-200 aspect-[3/4] relative">
+                <img class="w-full h-full object-contain shadow-2xl" src="" alt="Aperçu du document"/>
+                <div class="absolute inset-0 pointer-events-none border-[12px] border-white/5 opacity-50"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Data & Logic -->
+    <div class="col-span-12 lg:col-span-7 space-y-6">
+        <!-- Results wrapper -->
+        <div id="results-smart" class="hidden">
+            <!-- Detection & Specialization Card -->
+            <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm mb-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-secondary-container rounded-lg">
+                            <span class="material-symbols-outlined text-primary">analytics</span>
+                        </div>
+                        <h3 class="font-manrope font-bold text-lg">Détection &amp; Spécialisation</h3>
+                    </div>
+                    <span class="px-3 py-1 bg-primary text-white text-[10px] font-black rounded-full uppercase tracking-widest">IA Active</span>
+                </div>
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-2">Fournisseur détecté</label>
+                        <div class="bg-primary-fixed text-on-primary-fixed-variant px-4 py-3 rounded-lg flex items-center justify-between">
+                            <span id="detected-fournisseur" class="font-bold text-sm">&mdash;</span>
+                            <span class="material-symbols-outlined text-sm">verified</span>
+                        </div>
+                        <p class="text-[10px] mt-2 text-primary font-medium italic">Utilisation du prompt spécialisé</p>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-2">Forcer le fournisseur</label>
+                        <div class="relative">
+                            <select id="select-fournisseur-smart" class="w-full appearance-none bg-surface-container-low border-none rounded-lg px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary">
+                                <option value="Auto-detect">Auto-detect</option>
+                            </select>
+                            <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Extracted Data Card -->
+            <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-outline-variant/5 mb-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="p-2 bg-primary-fixed rounded-lg">
+                        <span class="material-symbols-outlined text-primary">list_alt</span>
+                    </div>
+                    <h3 class="font-manrope font-bold text-lg">Données Extraites</h3>
+                </div>
+                <div class="grid grid-cols-3 gap-y-6 gap-x-4">
+                    <!-- Field: NUMERO_FACTURE -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Numero Facture</label>
+                        <div id="smart-field-NUMERO_FACTURE" class="p-3 bg-surface-container-low rounded-lg text-sm font-medium border-l-4 border-primary">&mdash;</div>
+                    </div>
+                    <!-- Field: DATE_FACTURE -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Date</label>
+                        <div id="smart-field-DATE_FACTURE" class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">&mdash;</div>
+                    </div>
+                    <!-- Field: MONTANT_HT -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Total HT</label>
+                        <div id="smart-field-MONTANT_HT" class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">&mdash;</div>
+                    </div>
+                    <!-- Field: TAUX_TVA -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">TVA</label>
+                        <div id="smart-field-TAUX_TVA" class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">&mdash;</div>
+                    </div>
+                    <!-- Field: MONTANT_TTC -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Total TTC</label>
+                        <div id="smart-field-MONTANT_TTC" class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">&mdash;</div>
+                    </div>
+                    <!-- Field: NOM_INSTALLATEUR -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Installateur</label>
+                        <div id="smart-field-NOM_INSTALLATEUR" class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">&mdash;</div>
+                    </div>
+                    <!-- Field: COMMUNE_TRAVAUX -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Commune</label>
+                        <div id="smart-field-COMMUNE_TRAVAUX" class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">&mdash;</div>
+                    </div>
+                    <!-- Field: CODE_POSTAL -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Code Postal</label>
+                        <div id="smart-field-CODE_POSTAL" class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">&mdash;</div>
+                    </div>
+                    <!-- Field: ADRESSE_TRAVAUX -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Adresse</label>
+                        <div id="smart-field-ADRESSE_TRAVAUX" class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">&mdash;</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Raw JSON Expander -->
+            <details class="bg-white rounded-xl shadow-sm border border-outline-variant/10 group overflow-hidden">
+                <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors list-none">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-on-surface-variant">code</span>
+                        <span class="font-manrope font-bold text-sm">JSON brut de l'extraction</span>
+                    </div>
+                    <span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+                </summary>
+                <div class="p-4 bg-slate-900 border-t border-slate-800">
+                    <pre id="json-raw-smart" class="text-xs text-blue-300 font-mono leading-relaxed overflow-x-auto p-2"></pre>
+                </div>
+            </details>
+        </div><!-- /results-smart -->
+    </div>
+</div>
+{% endblock %}
