@@ -25,6 +25,8 @@ _spec_smart.loader.exec_module(_mod_smart)
 smart_get_ocr_text = _mod_smart.get_ocr_text
 smart_detect_installateur = _mod_smart.detect_installateur
 smart_extraire_champs = _mod_smart.extraire_champs
+smart_detect_avoir = _mod_smart.detect_avoir
+smart_inverser_montants_avoir = _mod_smart.inverser_montants_avoir
 SMART_INSTALLATEURS = _mod_smart.PROMPTS_INSTALLATEURS
 
 
@@ -262,12 +264,13 @@ def show_preview(uploaded):
         uploaded.seek(0)
 
 
-def export_excel(fields, filename, installateur=""):
+def export_excel(fields, filename, installateur="", is_avoir=False):
     """Wrapper : génère le même format Excel que le batch, avec une seule ligne."""
     return export_excel_batch([{
         "filename": filename,
         "fields": fields,
         "installateur": installateur or "",
+        "is_avoir": is_avoir,
     }])
 
 
@@ -275,10 +278,11 @@ def export_excel_batch(results_list):
     """Génère un fichier Excel stylisé avec une ligne par facture."""
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-    all_labels = ["Nom du PDF"] + [lbl for _, lbl in FIELDS_LEFT + FIELDS_RIGHT] + ["Fournisseur"]
+    all_labels = ["Nom du PDF", "Type"] + [lbl for _, lbl in FIELDS_LEFT + FIELDS_RIGHT] + ["Fournisseur"]
     rows = []
     for res in results_list:
         row = {"Nom du PDF": res["filename"]}
+        row["Type"] = "AVOIR" if res.get("is_avoir") else "FACTURE"
         for key, label in FIELDS_LEFT + FIELDS_RIGHT:
             val = res["fields"].get(key)
             if val is None or val == "null":
@@ -328,6 +332,7 @@ def export_excel_batch(results_list):
         val_fill_alt = PatternFill(start_color="F7F8FA", end_color="F7F8FA", fill_type="solid")
         val_fill_warn = PatternFill(start_color="FFF3E0", end_color="FFF3E0", fill_type="solid")
         val_font_warn = Font(name="Calibri", size=11, italic=True, color="E65100")
+        val_fill_avoir = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
 
         # Mapper label → clé pour identifier les champs à vérifier
         label_to_key = {lbl: key for key, lbl in FIELDS_LEFT + FIELDS_RIGHT}
@@ -336,6 +341,7 @@ def export_excel_batch(results_list):
             res = results_list[row_idx - 4]
             fields = res.get("fields") or {}
             a_verifier = fields.get("_a_verifier", [])
+            is_avoir = res.get("is_avoir", False)
 
             for col_idx in range(1, nb_cols + 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
@@ -346,7 +352,15 @@ def export_excel_batch(results_list):
                 col_label = all_labels[col_idx - 1]
                 field_key = label_to_key.get(col_label, "")
 
-                if col_idx == 1:
+                if is_avoir:
+                    # Ligne avoir → fond jaune pour toutes les cellules
+                    cell.fill = val_fill_avoir
+                    if col_idx == 1:
+                        cell.font = Font(name="Calibri", size=11, bold=True)
+                    elif not cell.value:
+                        cell.value = "Non detecte"
+                        cell.font = Font(name="Calibri", size=11, italic=True, color="C53030")
+                elif col_idx == 1:
                     # Colonne nom du PDF : fond alterné
                     cell.font = Font(name="Calibri", size=11, bold=True)
                     if (row_idx - 4) % 2 == 1:
@@ -480,8 +494,13 @@ def process_single_file(file_bytes, suffix, choix_fournisseur):
     else:
         installateur = choix_fournisseur.lower()
 
+    is_avoir = smart_detect_avoir(texte)
     fields = smart_extraire_champs(texte, installateur)
-    return fields, None, installateur
+
+    if is_avoir and fields:
+        fields = smart_inverser_montants_avoir(fields)
+
+    return fields, None, installateur, is_avoir
 
 
 def clean_json(raw):
@@ -551,7 +570,9 @@ def extract_gemma2(original_filename):
                 break
 
     if not texte:
-        return None, "OCR introuvable pour cette facture"
+        return None, "OCR introuvable pour cette facture", False
+
+    is_avoir = smart_detect_avoir(texte)
 
     prompt = PROMPT_TEXTE.format(texte=texte[:3000])
     response = ollama.chat(
@@ -562,9 +583,11 @@ def extract_gemma2(original_filename):
 
     try:
         result = json.loads(clean_json(response["message"]["content"]))
-        return result, None
+        if is_avoir and result:
+            result = smart_inverser_montants_avoir(result)
+        return result, None, is_avoir
     except json.JSONDecodeError:
-        return None, "Réponse JSON invalide"
+        return None, "Réponse JSON invalide", False
 
 
 # ─────────────────────────────────────────────────────────────
@@ -669,7 +692,7 @@ with tab1:
             show_preview(uploaded1)
 
         with st.spinner("Gemma2:9b analyse le texte OCR..."):
-            fields1, error1 = extract_gemma2(original_filename=uploaded1.name)
+            fields1, error1, is_avoir1 = extract_gemma2(original_filename=uploaded1.name)
 
         with col_res1:
             st.markdown('<div class="section-title">Champs extraits</div>', unsafe_allow_html=True)
@@ -690,7 +713,7 @@ with tab1:
             base_name = os.path.splitext(uploaded1.name)[0]
             st.download_button(
                 "Exporter en Excel",
-                data=export_excel(fields1, uploaded1.name, "gemma2-texte"),
+                data=export_excel(fields1, uploaded1.name, "gemma2-texte", is_avoir=is_avoir1),
                 file_name=f"{base_name}_extraction.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="dl_excel_tab1",
@@ -755,6 +778,7 @@ with tab2:
                 installateur_detecte = None
                 fields2 = None
                 error2 = "OCR introuvable pour cette facture"
+                is_avoir2 = False
             else:
                 # Choix manuel ou auto-detect
                 if choix_installateur == "Auto-detect":
@@ -767,7 +791,10 @@ with tab2:
                     installateur_detecte = choix_installateur.lower()
                     mode_detection = "manuel"
 
+                is_avoir2 = smart_detect_avoir(texte_ocr)
                 fields2 = smart_extraire_champs(texte_ocr, installateur_detecte)
+                if is_avoir2 and fields2:
+                    fields2 = smart_inverser_montants_avoir(fields2)
                 error2 = None
 
         with col_res2:
@@ -809,7 +836,7 @@ with tab2:
             base_name2 = os.path.splitext(uploaded2.name)[0]
             st.download_button(
                 "Exporter en Excel",
-                data=export_excel(fields2, uploaded2.name, installateur_detecte or ""),
+                data=export_excel(fields2, uploaded2.name, installateur_detecte or "", is_avoir=is_avoir2),
                 file_name=f"{base_name2}_extraction_smart.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="dl_excel_tab2",
@@ -880,7 +907,7 @@ with tab3:
             suffix = os.path.splitext(uploaded3.name)[1].lower()
 
             progress.progress(30, text="Extraction OCR... (DocTR)")
-            fields3, error3, installateur3 = process_single_file(file_bytes, suffix, choix3)
+            fields3, error3, installateur3, is_avoir3 = process_single_file(file_bytes, suffix, choix3)
             progress.progress(100, text="Terminé !")
             progress.empty()
 
@@ -919,7 +946,7 @@ with tab3:
                 base_name3 = os.path.splitext(uploaded3.name)[0]
                 st.download_button(
                     "Exporter en Excel",
-                    data=export_excel(fields3, uploaded3.name, installateur3 or ""),
+                    data=export_excel(fields3, uploaded3.name, installateur3 or "", is_avoir=is_avoir3),
                     file_name=f"{base_name3}_extraction_ocr.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="dl_excel_tab3",
@@ -977,19 +1004,21 @@ with tab3:
 
                     file_bytes = zf.read(fname)
                     suffix = os.path.splitext(fname)[1].lower()
-                    fields, error, installateur = process_single_file(file_bytes, suffix, choix3)
+                    fields, error, installateur, is_avoir = process_single_file(file_bytes, suffix, choix3)
 
                     if fields and not error:
                         batch_results.append({
                             "filename": short_name,
                             "fields": fields,
                             "installateur": installateur or "DEFAULT",
+                            "is_avoir": is_avoir,
                         })
                     else:
                         batch_results.append({
                             "filename": short_name,
                             "fields": {k: None for k, _ in FIELDS_LEFT + FIELDS_RIGHT},
                             "installateur": "ERREUR",
+                            "is_avoir": False,
                         })
 
                 progress_bar.progress(1.0, text=f"Terminé — {len(batch_results)} factures traitées !")
@@ -1039,7 +1068,7 @@ def export_excel_multi_sheets(results_list):
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
     columns = [
-        "NOM_FICHIER", "NUMERO_FACTURE", "DATE_FACTURE",
+        "NOM_FICHIER", "TYPE", "NUMERO_FACTURE", "DATE_FACTURE",
         "MONTANT_HT", "TAUX_TVA", "MONTANT_TTC",
         "NOM_INSTALLATEUR", "COMMUNE_TRAVAUX", "CODE_POSTAL", "ADRESSE_TRAVAUX",
     ]
@@ -1052,7 +1081,8 @@ def export_excel_multi_sheets(results_list):
         rows = []
         for res in items:
             row = {"NOM_FICHIER": res["filename"]}
-            for col, key in zip(columns[1:], field_keys):
+            row["TYPE"] = "AVOIR" if res.get("is_avoir") else "FACTURE"
+            for col, key in zip(columns[2:], field_keys):
                 val = res["fields"].get(key)
                 if val is None or val == "null":
                     val = ""
@@ -1076,6 +1106,7 @@ def export_excel_multi_sheets(results_list):
     ok_fill = PatternFill(start_color="E6F4EA", end_color="E6F4EA", fill_type="solid")
     warn_fill = PatternFill(start_color="FFF3E0", end_color="FFF3E0", fill_type="solid")
     warn_font = Font(name="Calibri", size=11, italic=True, color="E65100")
+    avoir_fill = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
     thin_border = Border(
         left=Side(style="thin", color="D1D5DB"),
         right=Side(style="thin", color="D1D5DB"),
@@ -1084,7 +1115,7 @@ def export_excel_multi_sheets(results_list):
     )
 
     # Mapper colonne → clé pour les champs à vérifier
-    col_to_key = dict(zip(columns[1:], field_keys))
+    col_to_key = dict(zip(columns[2:], field_keys))
 
     def style_sheet(ws, rows_data, items):
         # Titre
@@ -1108,6 +1139,7 @@ def export_excel_multi_sheets(results_list):
             res = items[row_idx - 4]
             fields = res.get("fields") or {}
             a_verifier = fields.get("_a_verifier", [])
+            is_avoir = res.get("is_avoir", False)
 
             for col_idx in range(1, len(columns) + 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
@@ -1117,7 +1149,17 @@ def export_excel_multi_sheets(results_list):
                 col_name = columns[col_idx - 1]
                 field_key = col_to_key.get(col_name, "")
 
-                if col_idx == 1:
+                if is_avoir:
+                    # Ligne avoir → fond jaune pour toutes les cellules
+                    cell.fill = avoir_fill
+                    if col_idx == 1:
+                        cell.font = Font(name="Calibri", size=11, bold=True)
+                    elif not cell.value:
+                        cell.value = "Non detecte"
+                        cell.font = err_font
+                    else:
+                        cell.font = val_font
+                elif col_idx == 1:
                     cell.font = Font(name="Calibri", size=11, bold=True)
                 elif field_key in a_verifier:
                     cell.fill = warn_fill
@@ -1228,12 +1270,16 @@ with tab4:
                 if texte:
                     # OCR pre-calcule trouve
                     installateur = smart_detect_installateur(texte)
+                    is_avoir = smart_detect_avoir(texte)
                     fields = smart_extraire_champs(texte, installateur)
+                    if is_avoir and fields:
+                        fields = smart_inverser_montants_avoir(fields)
                     if fields:
                         batch_results4.append({
                             "filename": short_name,
                             "fields": fields,
                             "installateur": installateur or "DEFAULT",
+                            "is_avoir": is_avoir,
                             "source": "OCR pre-calcule",
                         })
                         continue
@@ -1242,7 +1288,7 @@ with tab4:
                 try:
                     file_bytes4 = zf4.read(fname)
                     suffix4 = os.path.splitext(fname)[1].lower()
-                    fields, error, installateur = process_single_file(
+                    fields, error, installateur, is_avoir = process_single_file(
                         file_bytes4, suffix4, "Auto-detect"
                     )
                     if fields and not error:
@@ -1250,6 +1296,7 @@ with tab4:
                             "filename": short_name,
                             "fields": fields,
                             "installateur": installateur or "DEFAULT",
+                            "is_avoir": is_avoir,
                             "source": "DocTR live",
                         })
                     else:
@@ -1257,6 +1304,7 @@ with tab4:
                             "filename": short_name,
                             "fields": {k: None for k, _ in FIELDS_LEFT + FIELDS_RIGHT},
                             "installateur": "ERREUR",
+                            "is_avoir": False,
                             "source": error or "Echec extraction",
                         })
                 except Exception as e:
@@ -1264,6 +1312,7 @@ with tab4:
                         "filename": short_name,
                         "fields": {k: None for k, _ in FIELDS_LEFT + FIELDS_RIGHT},
                         "installateur": "ERREUR",
+                        "is_avoir": False,
                         "source": str(e),
                     })
 

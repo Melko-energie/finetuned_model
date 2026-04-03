@@ -453,6 +453,7 @@ PARTICULARITÉS RCPI :
 - Numéro facture format "GL XXX-XX-XX" (ex: "GL 027-01-22"). Le préfixe "GL" est OBLIGATOIRE. Avoir : "AGL 001-03-22"
 - TVA : 20%
 - Installateur : RCPI (SARL), 1 rue de Pinconlieu, 60000 Beauvais
+- DATE_FACTURE : chercher UNIQUEMENT la date après "Beauvais" (ex: "Beauvais, le 30 septembre 2022" → "30/09/2022"). Convertir en format JJ/MM/AAAA. IGNORER toute autre date du document.
 
 MONTANT_HT :
 - Cherche UNIQUEMENT le montant à côté de "TOTAL HT" (pas "Sous-total")
@@ -591,6 +592,21 @@ def detect_installateur(texte):
                 return nom
 
     return "DEFAULT"
+
+
+# ─────────────────────────────────────────
+# DÉTECTION AVOIR
+# ─────────────────────────────────────────
+
+AVOIR_KEYWORDS = ["avoir", "avoirs", "note de crédit", "note de credit"]
+
+def detect_avoir(texte):
+    """Détecte si le document est un avoir (credit note) via mots-clés OCR."""
+    texte_lower = texte.lower()
+    for mot in AVOIR_KEYWORDS:
+        if mot in texte_lower:
+            return True
+    return False
 
 
 # ─────────────────────────────────────────
@@ -741,10 +757,11 @@ def clean_json(raw):
 # EXTRACTION VIA GEMMA2
 # ─────────────────────────────────────────
 
-def verifier_coherence_montants(result):
+def verifier_coherence_montants(result, is_avoir=False):
     """
     Vérifie mathématiquement : TTC = HT × (1 + TVA/100) ± 5%.
     Ajoute '_a_verifier': ['MONTANT_HT', 'MONTANT_TTC'] si incohérent.
+    Pour les avoirs, la vérification utilise les valeurs absolues.
     """
     a_verifier = []
 
@@ -762,20 +779,24 @@ def verifier_coherence_montants(result):
         tva_str = str(tva_raw).replace("%", "").replace(",", ".").strip()
         tva = float(tva_str)
 
-        # Vérification TTC < HT
-        if ttc < ht:
+        # Pour les avoirs, travailler en valeur absolue pour la vérification
+        ht_abs = abs(ht)
+        ttc_abs = abs(ttc)
+
+        # Vérification TTC < HT (en valeur absolue)
+        if ttc_abs < ht_abs:
             a_verifier.extend(["MONTANT_HT", "MONTANT_TTC"])
-            print(f"  [!] INCOHERENCE : TTC ({ttc}) < HT ({ht})")
+            print(f"  [!] INCOHERENCE : |TTC| ({ttc_abs}) < |HT| ({ht_abs})")
 
         # Vérification TTC = HT × (1 + TVA/100) ± 5%
-        ttc_attendu = ht * (1 + tva / 100)
-        ecart = abs(ttc - ttc_attendu) / ttc_attendu if ttc_attendu > 0 else 1
+        ttc_attendu = ht_abs * (1 + tva / 100)
+        ecart = abs(ttc_abs - ttc_attendu) / ttc_attendu if ttc_attendu > 0 else 1
         if ecart > 0.05:
             if "MONTANT_HT" not in a_verifier:
                 a_verifier.extend(["MONTANT_HT", "MONTANT_TTC"])
-            print(f"  [!] INCOHERENCE : TTC={ttc}, attendu={ttc_attendu:.2f} (ecart {ecart:.1%})")
+            print(f"  [!] INCOHERENCE : TTC={ttc_abs}, attendu={ttc_attendu:.2f} (ecart {ecart:.1%})")
         else:
-            print(f"  [OK] Coherence OK : HT={ht} x {1 + tva/100} = {ttc_attendu:.2f} ~ TTC={ttc}")
+            print(f"  [OK] Coherence OK : HT={ht_abs} x {1 + tva/100} = {ttc_attendu:.2f} ~ TTC={ttc_abs}")
 
     except (ValueError, TypeError) as e:
         print(f"  [!] Verification impossible : {e}")
@@ -783,6 +804,19 @@ def verifier_coherence_montants(result):
     if a_verifier:
         result["_a_verifier"] = list(set(a_verifier))
 
+    return result
+
+
+def inverser_montants_avoir(result):
+    """Inverse les montants HT et TTC pour un avoir (les rend négatifs)."""
+    for champ in ["MONTANT_HT", "MONTANT_TTC"]:
+        val = result.get(champ)
+        if val and val != "null":
+            try:
+                num = float(str(val).replace(",", ".").replace(" ", "").replace("€", ""))
+                result[champ] = str(round(-abs(num), 2))
+            except (ValueError, TypeError):
+                pass
     return result
 
 
@@ -816,20 +850,27 @@ def extraire_champs(texte, installateur):
 # ─────────────────────────────────────────
 
 def pipeline(pdf_path):
-    """Pipeline complet : OCR → détection fournisseur → extraction."""
+    """Pipeline complet : OCR → détection fournisseur → détection avoir → extraction."""
     print(f"\n{'='*60}")
     print(f"Facture : {os.path.basename(pdf_path)}")
 
     texte = get_ocr_text(pdf_path)
     if texte is None:
-        return None, "ERREUR"
+        return None, "ERREUR", False
 
     installateur = detect_installateur(texte)
     print(f"  Fournisseur détecté : {installateur}")
 
+    is_avoir = detect_avoir(texte)
+    if is_avoir:
+        print(f"  [AVOIR] Document détecté comme un AVOIR")
+
     result = extraire_champs(texte, installateur)
 
-    return result, installateur
+    if is_avoir and result:
+        result = inverser_montants_avoir(result)
+
+    return result, installateur, is_avoir
 
 
 # ─────────────────────────────────────────
@@ -854,7 +895,7 @@ if __name__ == "__main__":
             print(f"\n  SKIP: {pdf_path} introuvable")
             continue
 
-        result, installateur = pipeline(pdf_path)
+        result, installateur, is_avoir = pipeline(pdf_path)
 
         if result:
             success += 1
