@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "secondary-fixed": "#d3e4fe",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "outline-variant": "#c3c6d6",
+                    "surface": "#f7f9fb",
+                    "surface-variant": "#e0e3e5",
+                    "primary-fixed": "#dae2ff",
+                    "on-primary-fixed": "#001848",
+                    "tertiary-fixed": "#ffddb8",
+                    "on-error": "#ffffff",
+                    "secondary-container": "#d0e1fb",
+                    "surface-container-low": "#f2f4f6",
+                    "primary-fixed-dim": "#b2c5ff",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-primary": "#b2c5ff",
+                    "on-secondary": "#ffffff",
+                    "on-background": "#191c1e",
+                    "on-error-container": "#93000a",
+                    "tertiary-container": "#805000",
+                    "outline": "#737685",
+                    "surface-container-high": "#e6e8ea",
+                    "on-primary-container": "#c4d2ff",
+                    "surface-dim": "#d8dadc",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#0b1c30",
+                    "surface-container-highest": "#e0e3e5",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "background": "#f7f9fb",
+                    "on-secondary-container": "#54647a",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed-variant": "#0040a2",
+                    "on-surface-variant": "#434654",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "on-tertiary-fixed": "#2a1700",
+                    "on-primary": "#ffffff",
+                    "primary": "#003d9b",
+                    "secondary": "#505f76",
+                    "inverse-surface": "#2d3133",
+                    "on-tertiary-container": "#ffc988",
+                    "surface-tint": "#0c56d0",
+                    "surface-bright": "#f7f9fb",
+                    "inverse-on-surface": "#eff1f3",
+                    "primary-container": "#0052cc",
+                    "on-surface": "#191c1e",
+                    "tertiary": "#603b00",
+                    "surface-container": "#eceef0",
+                    "error": "#ba1a1a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; }
+        .font-manrope { font-family: 'Manrope', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(16px); }
+        .tonal-shift-no-borders { border: none !important; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-background">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex items-center px-6 h-16 bg-blue-900 dark:bg-slate-950 bg-gradient-to-r from-[#003d9b] to-[#0052cc] shadow-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">description</span>
+<h1 class="font-manrope font-bold text-2xl tracking-tight text-white">Extraction de Factures BTP</h1>
+</div>
+<div class="ml-auto flex items-center gap-6">
+<div class="hidden md:flex gap-4">
+<a class="text-blue-100/70 font-medium hover:bg-white/10 transition-colors px-3 py-1 rounded" href="#">Gemma2:9b Texte</a>
+<a class="border-b-4 border-white text-white font-bold px-3 py-1" href="#">Gemma2 Smart</a>
+<a class="text-blue-100/70 font-medium hover:bg-white/10 transition-colors px-3 py-1 rounded" href="#">Nouvelle Facture</a>
+</div>
+<div class="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-sm">person</span>
+</div>
+</div>
+</header>
+<!-- NavigationDrawer -->
+<aside class="h-screen w-72 fixed left-0 top-0 bg-[#eceef0] dark:bg-slate-900 flex flex-col py-8 px-4 z-40 pt-20 tonal-shift-no-borders">
+<div class="mb-10 px-4">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white font-black text-xl">M</div>
+<div>
+<h2 class="font-manrope font-extrabold text-[#003d9b] dark:text-blue-400 text-lg leading-tight">Extraction Suite</h2>
+<p class="text-xs text-slate-500">v3.0.0</p>
+</div>
+</div>
+<p class="text-[10px] uppercase tracking-widest font-bold text-slate-400 mt-4">Configuration active</p>
+<div class="mt-2 p-3 bg-white/50 rounded-xl">
+<p class="text-xs font-medium text-slate-700">OCR: DocTR</p>
+<p class="text-xs font-medium text-slate-700">Model: Gemma2:9b</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:translate-x-1 transition-transform duration-200 font-inter text-sm font-medium" href="#">
+<span class="material-symbols-outlined">article</span>
+                Gemma2:9b Texte
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 text-[#003d9b] font-bold border-r-4 border-[#003d9b] font-inter text-sm tracking-normal" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">psychology</span>
+                Gemma2 Smart
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:translate-x-1 transition-transform duration-200 font-inter text-sm font-medium" href="#">
+<span class="material-symbols-outlined">upload_file</span>
+                Nouvelle Facture
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:translate-x-1 transition-transform duration-200 font-inter text-sm font-medium" href="#">
+<span class="material-symbols-outlined">layers</span>
+                Traitement par lot
+            </a>
+</nav>
+<div class="mt-auto p-4 bg-primary-container/10 rounded-2xl">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-sm">info</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Support Technique</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-72 pt-24 pb-12 px-8 min-h-screen bg-surface">
+<div class="max-w-6xl mx-auto space-y-8">
+<!-- Page Header -->
+<div class="flex justify-between items-end">
+<div>
+<span class="text-xs font-bold text-primary tracking-widest uppercase mb-1 block">Mode Intelligent</span>
+<h2 class="font-manrope text-3xl font-extrabold text-on-background">Gemma2 Smart Extraction</h2>
+</div>
+<button class="bg-primary text-white px-6 py-2.5 rounded-md flex items-center gap-2 font-bold text-sm shadow-md hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm">download</span>
+                    Exporter vers Excel
+                </button>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Left Column: Upload & Preview -->
+<div class="col-span-12 lg:col-span-5 space-y-6">
+<!-- Upload Zone -->
+<div class="bg-surface-container-high border-2 border-dashed border-outline-variant/30 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-primary-fixed transition-colors duration-300 group cursor-pointer">
+<div class="w-16 h-16 rounded-full bg-white flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-primary text-3xl">cloud_upload</span>
+</div>
+<p class="font-manrope font-bold text-on-surface">Glissez-déposez vos factures ici</p>
+<p class="text-xs text-on-surface-variant mt-1">PDF, JPG, PNG supportés (Max 10MB)</p>
+</div>
+<!-- Document Preview -->
+<div class="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm border border-outline-variant/10">
+<div class="bg-surface-container-low px-4 py-2 flex items-center justify-between">
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Aperçu du document</span>
+<div class="flex gap-2">
+<button class="p-1 hover:bg-white rounded"><span class="material-symbols-outlined text-sm">zoom_in</span></button>
+<button class="p-1 hover:bg-white rounded"><span class="material-symbols-outlined text-sm">open_in_full</span></button>
+</div>
+</div>
+<div class="p-4 bg-slate-200 aspect-[3/4] relative">
+<img class="w-full h-full object-contain shadow-2xl" data-alt="high quality scanned construction invoice from A2M showing technical details, headers, and line items on professional stationary" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdVi9dY8XCvgJNTdwI716AwaOeO_rnH1tYCwzlfb9F9Iz0Bw1X70Rg39lWETc1he8VSIKnH49MJsfdaQAoQRjdeMuw5bJ3u0HJVxvvFKvbDYe9iwz9GHvFQVliHBjVs2IVJ-pQ9Zior0K4fUK3RdYEmasGdDO247myGlchS170O3F4ZcoPRcWB9OGmllTzwDbb2MnPzTZyHCj3acMbXGGCCcbq0Psk11cR29aLiYMgwrWI-97_3DfL1w7EEukjpR1t2ImV7-e1rtk"/>
+<div class="absolute inset-0 pointer-events-none border-[12px] border-white/5 opacity-50"></div>
+</div>
+</div>
+</div>
+<!-- Right Column: Data & Logic -->
+<div class="col-span-12 lg:col-span-7 space-y-6">
+<!-- Detection & Specialization Card -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-3">
+<div class="p-2 bg-secondary-container rounded-lg">
+<span class="material-symbols-outlined text-primary">analytics</span>
+</div>
+<h3 class="font-manrope font-bold text-lg">Détection &amp; Spécialisation</h3>
+</div>
+<span class="px-3 py-1 bg-primary text-white text-[10px] font-black rounded-full uppercase tracking-widest">IA Active</span>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<div>
+<label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-2">Fournisseur détecté</label>
+<div class="bg-primary-fixed text-on-primary-fixed-variant px-4 py-3 rounded-lg flex items-center justify-between">
+<span class="font-bold text-sm">A2M</span>
+<span class="material-symbols-outlined text-sm">verified</span>
+</div>
+<p class="text-[10px] mt-2 text-primary font-medium italic">Utilisation du prompt spécialisé pour A2M</p>
+</div>
+<div>
+<label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-2">Forcer le fournisseur</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface-container-low border-none rounded-lg px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary">
+<option>A2M</option>
+<option>RCPI</option>
+<option>Ternel</option>
+<option>SOCOTEC</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Extracted Data Card -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-outline-variant/5">
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-primary-fixed rounded-lg">
+<span class="material-symbols-outlined text-primary">list_alt</span>
+</div>
+<h3 class="font-manrope font-bold text-lg">Données Extraites</h3>
+</div>
+<div class="grid grid-cols-3 gap-y-6 gap-x-4">
+<!-- Field 1 -->
+<div class="space-y-1">
+<label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Numero Facture</label>
+<div class="p-3 bg-surface-container-low rounded-lg text-sm font-medium border-l-4 border-primary">FACT-2023-0892</div>
+</div>
+<!-- Field 2 -->
+<div class="space-y-1">
+<label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Date</label>
+<div class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">12/10/2023</div>
+</div>
+<!-- Field 3 (Inconsistency - Orange) -->
+<div class="space-y-1">
+<label class="text-[10px] font-bold text-tertiary-container uppercase tracking-tight flex items-center gap-1">
+                                    Total HT
+                                    <span class="material-symbols-outlined text-[10px]">warning</span>
+</label>
+<div class="p-3 bg-tertiary-fixed rounded-lg text-sm font-bold text-on-tertiary-fixed-variant">1,450.00 €</div>
+</div>
+<!-- Field 4 -->
+<div class="space-y-1">
+<label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">TVA (20%)</label>
+<div class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">290.00 €</div>
+</div>
+<!-- Field 5 -->
+<div class="space-y-1">
+<label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Total TTC</label>
+<div class="p-3 bg-surface-container-low rounded-lg text-sm font-bold text-primary">1,740.00 €</div>
+</div>
+<!-- Field 6 -->
+<div class="space-y-1">
+<label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Installateur</label>
+<div class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">Jean Dupont</div>
+</div>
+<!-- Field 7 -->
+<div class="space-y-1">
+<label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Commune</label>
+<div class="p-3 bg-surface-container-low rounded-lg text-sm font-medium">Bordeaux</div>
+</div>
+<!-- Field 8 (Missing - Red) -->
+<div class="space-y-1">
+<label class="text-[10px] font-bold text-error uppercase tracking-tight flex items-center gap-1">
+                                    Code Postal
+                                    <span class="material-symbols-outlined text-[10px]">error</span>
+</label>
+<div class="p-3 bg-error-container rounded-lg text-sm font-medium text-on-error-container italic">Donnée manquante</div>
+</div>
+<!-- Field 9 -->
+<div class="space-y-1">
+<label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Adresse</label>
+<div class="p-3 bg-surface-container-low rounded-lg text-sm font-medium truncate">12 Rue des Lilas</div>
+</div>
+</div>
+</div>
+<!-- Raw JSON Expander -->
+<details class="bg-white rounded-xl shadow-sm border border-outline-variant/10 group overflow-hidden">
+<summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors list-none">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">code</span>
+<span class="font-manrope font-bold text-sm">JSON brut de l'extraction</span>
+</div>
+<span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+</summary>
+<div class="p-4 bg-slate-900 border-t border-slate-800">
+<pre class="text-xs text-blue-300 font-mono leading-relaxed overflow-x-auto p-2">{
+  "header": {
+    "invoice_number": "FACT-2023-0892",
+    "date": "2023-10-12",
+    "vendor": "A2M",
+    "tax_id": "FR458920192"
+  },
+  "amounts": {
+    "total_ht": 1450.00,
+    "vat_amount": 290.00,
+    "total_ttc": 1740.00,
+    "currency": "EUR"
+  },
+  "metadata": {
+    "installer": "Jean Dupont",
+    "location": {
+      "city": "Bordeaux",
+      "address": "12 Rue des Lilas",
+      "zip": null
+    },
+    "confidence_score": 0.94,
+    "model_version": "gemma2-9b-smart-v3"
+  }
+}
+                            </pre>
+</div>
+</details>
+</div>
+</div>
+</div>
+</main>
+</body></html>

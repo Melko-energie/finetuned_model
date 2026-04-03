@@ -135,13 +135,3 @@ Interface: Streamlit
 
 ---
 
-## Comment utiliser ce fichier
-
-Commence chaque prompt Claude Code par :
-
-```
-Lis d'abord CONTEXT.md a la racine du projet.
-Ensuite : [ta demande ici]
-Contraintes : ne modifie QUE ce qui est demande,
-ne refactorise pas, ne renomme pas les variables.
-```
