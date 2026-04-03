@@ -1,12 +1,117 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html class="light" lang="fr">
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Extraction de Factures BTP</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "tertiary-fixed-dim":"#ffb95f","secondary-fixed":"#d3e4fe",
+        "on-secondary-fixed-variant":"#38485d","outline-variant":"#c3c6d6",
+        "surface":"#f7f9fb","surface-variant":"#e0e3e5",
+        "primary-fixed":"#dae2ff","on-primary-fixed":"#001848",
+        "tertiary-fixed":"#ffddb8","on-error":"#ffffff",
+        "secondary-container":"#d0e1fb","surface-container-low":"#f2f4f6",
+        "primary-fixed-dim":"#b2c5ff","surface-container-lowest":"#ffffff",
+        "inverse-primary":"#b2c5ff","on-secondary":"#ffffff",
+        "on-background":"#191c1e","on-error-container":"#93000a",
+        "tertiary-container":"#805000","outline":"#737685",
+        "surface-container-high":"#e6e8ea","on-primary-container":"#c4d2ff",
+        "surface-dim":"#d8dadc","error-container":"#ffdad6",
+        "on-secondary-fixed":"#0b1c30","surface-container-highest":"#e0e3e5",
+        "on-tertiary-fixed-variant":"#653e00","background":"#f7f9fb",
+        "on-secondary-container":"#54647a","on-tertiary":"#ffffff",
+        "on-primary-fixed-variant":"#0040a2","on-surface-variant":"#434654",
+        "secondary-fixed-dim":"#b7c8e1","on-tertiary-fixed":"#2a1700",
+        "on-primary":"#ffffff","primary":"#003d9b","secondary":"#505f76",
+        "inverse-surface":"#2d3133","on-tertiary-container":"#ffc988",
+        "surface-tint":"#0c56d0","surface-bright":"#f7f9fb",
+        "inverse-on-surface":"#eff1f3","primary-container":"#0052cc",
+        "on-surface":"#191c1e","tertiary":"#603b00",
+        "surface-container":"#eceef0","error":"#ba1a1a"
+      },
+      borderRadius: {"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},
+      fontFamily: {"headline":["Manrope"],"body":["Inter"],"label":["Inter"]}
+    }
+  }
+}
+</script>
+<style>
+body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; min-height: 100dvh; }
+.font-manrope { font-family: 'Manrope', sans-serif; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.tonal-shift-no-borders { border: none !important; }
+.glass-preview { background: rgba(255,255,255,0.8); backdrop-filter: blur(16px); }
+</style>
 </head>
-<body>
-<h1>Placeholder</h1>
-{% block content %}{% endblock %}
+<body class="bg-surface font-body text-on-surface min-h-screen">
+
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex items-center px-6 h-16 bg-gradient-to-r from-[#003d9b] to-[#0052cc] shadow-lg">
+  <div class="flex items-center gap-3">
+    <span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">description</span>
+    <h1 class="font-manrope font-bold text-2xl tracking-tight text-white">Extraction de Factures BTP</h1>
+  </div>
+  <div class="ml-auto flex items-center gap-6">
+    <div class="text-white font-black tracking-widest uppercase text-sm">Melko</div>
+  </div>
+</header>
+
+<!-- Sidebar -->
+<aside class="h-screen w-72 fixed left-0 top-0 bg-[#eceef0] z-40 pt-16 tonal-shift-no-borders">
+  <div class="flex flex-col h-full py-8 px-4">
+    <div class="flex items-center gap-3 mb-10 px-2">
+      <div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">M</div>
+      <div>
+        <h2 class="font-manrope font-extrabold text-blue-800 text-sm leading-tight">Extraction Suite</h2>
+        <p class="text-xs text-slate-500">v3.0.0</p>
+      </div>
+    </div>
+    <div class="px-4 mb-4">
+      <p class="text-[10px] uppercase tracking-widest font-bold text-slate-400">Configuration</p>
+      <div class="mt-2 p-3 bg-white/50 rounded-xl">
+        <p class="text-xs font-medium text-slate-700">OCR: DocTR</p>
+        <p class="text-xs font-medium text-slate-700">Model: Gemma2:9b</p>
+      </div>
+    </div>
+    <nav class="space-y-1">
+      <a href="/texte" class="flex items-center gap-3 px-4 py-3 {% if active == 'texte' %}bg-white text-[#003d9b] font-bold border-r-4 border-[#003d9b]{% else %}text-slate-600 hover:bg-slate-200/50 hover:translate-x-1 transition-transform duration-200{% endif %} text-sm font-medium tracking-normal">
+        <span class="material-symbols-outlined text-xl" {% if active == 'texte' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>article</span>
+        <span>Gemma2:9b Texte</span>
+      </a>
+      <a href="/smart" class="flex items-center gap-3 px-4 py-3 {% if active == 'smart' %}bg-white text-[#003d9b] font-bold border-r-4 border-[#003d9b]{% else %}text-slate-600 hover:bg-slate-200/50 hover:translate-x-1 transition-transform duration-200{% endif %} text-sm font-medium tracking-normal">
+        <span class="material-symbols-outlined text-xl" {% if active == 'smart' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>psychology</span>
+        <span>Gemma2 Smart</span>
+      </a>
+      <a href="/nouvelle" class="flex items-center gap-3 px-4 py-3 {% if active == 'nouvelle' %}bg-white text-[#003d9b] font-bold border-r-4 border-[#003d9b]{% else %}text-slate-600 hover:bg-slate-200/50 hover:translate-x-1 transition-transform duration-200{% endif %} text-sm font-medium tracking-normal">
+        <span class="material-symbols-outlined text-xl" {% if active == 'nouvelle' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>upload_file</span>
+        <span>Nouvelle Facture</span>
+      </a>
+      <a href="/batch" class="flex items-center gap-3 px-4 py-3 {% if active == 'batch' %}bg-white text-[#003d9b] font-bold border-r-4 border-[#003d9b]{% else %}text-slate-600 hover:bg-slate-200/50 hover:translate-x-1 transition-transform duration-200{% endif %} text-sm font-medium tracking-normal">
+        <span class="material-symbols-outlined text-xl" {% if active == 'batch' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>layers</span>
+        <span>Traitement par lot</span>
+      </a>
+    </nav>
+    <div class="mt-auto px-4 pb-4">
+      <span class="text-[10px] font-bold text-slate-400 tracking-widest">VERSION v3.0.0</span>
+    </div>
+  </div>
+</aside>
+
+<!-- Main Content -->
+<main class="ml-72 pt-24 pb-12 px-8 min-h-screen bg-surface">
+  <div class="max-w-6xl mx-auto space-y-8">
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+<script src="/static/js/app.js"></script>
 </body>
 </html>
