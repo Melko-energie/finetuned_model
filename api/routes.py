@@ -1,3 +1,79 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, File, UploadFile, Form
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+import io
+import os
+
+from core.extraction import (
+    extract_from_precomputed_ocr,
+    extract_smart,
+    process_file_live,
+    process_batch_zip,
+    export_excel_batch,
+    export_excel_multi_sheets,
+    get_fournisseurs_list,
+)
 
 router = APIRouter(prefix="/api")
+
+
+@router.get("/fournisseurs")
+async def list_fournisseurs():
+    return {"fournisseurs": get_fournisseurs_list()}
+
+
+@router.post("/extract-texte")
+async def api_extract_texte(file: UploadFile = File(...)):
+    result = extract_from_precomputed_ocr(file.filename)
+    return result
+
+
+@router.post("/extract-smart")
+async def api_extract_smart(
+    file: UploadFile = File(...),
+    fournisseur: str = Form("Auto-detect"),
+):
+    result = extract_smart(file.filename, fournisseur)
+    return result
+
+
+@router.post("/extract-ocr")
+async def api_extract_ocr(
+    file: UploadFile = File(...),
+    fournisseur: str = Form("Auto-detect"),
+):
+    file_bytes = await file.read()
+    suffix = os.path.splitext(file.filename)[1].lower()
+    result = process_file_live(file_bytes, suffix, fournisseur)
+    return result
+
+
+@router.post("/batch")
+async def api_batch(file: UploadFile = File(...)):
+    zip_bytes = await file.read()
+    results = process_batch_zip(zip_bytes)
+    return {"results": results, "total": len(results)}
+
+
+class ExportRequest(BaseModel):
+    results: list[dict]
+
+
+@router.post("/export-excel")
+async def api_export_excel(data: ExportRequest):
+    xlsx_bytes = export_excel_batch(data.results)
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=extraction.xlsx"},
+    )
+
+
+@router.post("/export-excel-multi")
+async def api_export_excel_multi(data: ExportRequest):
+    xlsx_bytes = export_excel_multi_sheets(data.results)
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=extraction_multi.xlsx"},
+    )
