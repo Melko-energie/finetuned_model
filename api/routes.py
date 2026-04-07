@@ -4,11 +4,14 @@ from pydantic import BaseModel
 import io
 import os
 
+import json as json_module
+
 from core.extraction import (
     extract_from_precomputed_ocr,
     extract_smart,
     process_file_live,
     process_batch_zip,
+    iter_batch_zip,
     export_excel_batch,
     export_excel_multi_sheets,
     get_fournisseurs_list,
@@ -51,8 +54,22 @@ async def api_extract_ocr(
 @router.post("/batch")
 async def api_batch(file: UploadFile = File(...)):
     zip_bytes = await file.read()
-    results = process_batch_zip(zip_bytes)
-    return {"results": results, "total": len(results)}
+
+    def event_stream():
+        results = []
+        for idx, total, result in iter_batch_zip(zip_bytes):
+            results.append(result)
+            event = {
+                "type": "progress",
+                "index": idx + 1,
+                "total": total,
+                "result": result,
+            }
+            yield f"data: {json_module.dumps(event, ensure_ascii=False)}\n\n"
+        # Final event with all results
+        yield f"data: {json_module.dumps({'type': 'done', 'results': results, 'total': len(results)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 class ExportRequest(BaseModel):

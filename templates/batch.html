@@ -99,11 +99,20 @@
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
 
-        <!-- Results List -->
-        <div id="results-batch" class="col-span-12 space-y-2">
-            <h4 class="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-widest px-1">Résultats individuels</h4>
-            <!-- JS will populate invoice items here -->
-        </div>
+        <!-- Results List (expander) -->
+        <details id="results-wrapper-batch" class="col-span-12 bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm group">
+            <summary class="list-none flex items-center justify-between p-5 cursor-pointer hover:bg-surface-container-low transition-colors">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-primary">list_alt</span>
+                    <span class="font-headline font-bold text-on-surface">Résultats individuels</span>
+                    <span id="results-count-batch" class="text-xs font-bold text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full">0</span>
+                </div>
+                <span class="material-symbols-outlined text-on-surface-variant transition-transform group-open:rotate-180">expand_more</span>
+            </summary>
+            <div id="results-batch" class="px-4 pb-4 space-y-2">
+                <!-- JS will populate invoice items here -->
+            </div>
+        </details>
 
         <!-- Excel multi-feuilles preview -->
         <div class="col-span-12 bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm border border-outline-variant/5">

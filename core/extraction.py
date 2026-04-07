@@ -298,8 +298,8 @@ def process_file_live(file_bytes: bytes, suffix: str, fournisseur: str = "Auto-d
     }
 
 
-def process_batch_zip(zip_bytes: bytes) -> list[dict]:
-    """Process a ZIP of invoices. Returns list of result dicts."""
+def iter_batch_zip(zip_bytes: bytes):
+    """Generator: yields (index, total, result_dict) for each invoice in the ZIP."""
     zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
     valid_ext = {".pdf", ".png", ".jpg", ".jpeg"}
     file_names = [
@@ -308,9 +308,9 @@ def process_batch_zip(zip_bytes: bytes) -> list[dict]:
         and os.path.splitext(n)[1].lower() in valid_ext
     ]
     file_names.sort()
+    total = len(file_names)
 
-    results = []
-    for fname in file_names:
+    for idx, fname in enumerate(file_names):
         short_name = os.path.basename(fname)
 
         # Try pre-computed OCR first
@@ -322,13 +322,13 @@ def process_batch_zip(zip_bytes: bytes) -> list[dict]:
             if is_avoir and fields:
                 fields = inverser_montants_avoir(fields)
             if fields:
-                results.append({
+                yield idx, total, {
                     "filename": short_name,
                     "fields": fields,
                     "installateur": installateur or "DEFAULT",
                     "is_avoir": is_avoir,
                     "source": "OCR pre-calcule",
-                })
+                }
                 continue
 
         # Fallback: DocTR live
@@ -337,31 +337,34 @@ def process_batch_zip(zip_bytes: bytes) -> list[dict]:
             suffix = os.path.splitext(fname)[1].lower()
             res = process_file_live(file_bytes, suffix, "Auto-detect")
             if res["fields"] and not res["error"]:
-                results.append({
+                yield idx, total, {
                     "filename": short_name,
                     "fields": res["fields"],
                     "installateur": res["installateur"] or "DEFAULT",
                     "is_avoir": res["is_avoir"],
                     "source": "DocTR live",
-                })
+                }
             else:
-                results.append({
+                yield idx, total, {
                     "filename": short_name,
                     "fields": {k: None for k in ALL_FIELD_KEYS},
                     "installateur": "ERREUR",
                     "is_avoir": False,
                     "source": res["error"] or "Echec extraction",
-                })
+                }
         except Exception as e:
-            results.append({
+            yield idx, total, {
                 "filename": short_name,
                 "fields": {k: None for k in ALL_FIELD_KEYS},
                 "installateur": "ERREUR",
                 "is_avoir": False,
                 "source": str(e),
-            })
+            }
 
-    return results
+
+def process_batch_zip(zip_bytes: bytes) -> list[dict]:
+    """Process a ZIP of invoices. Returns list of result dicts."""
+    return [result for _, _, result in iter_batch_zip(zip_bytes)]
 
 
 # ─────────────────────────────────────────

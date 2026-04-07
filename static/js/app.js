@@ -111,6 +111,51 @@ async function loadFournisseurs(selectId) {
 }
 
 
+/**
+ * Upload a file and read SSE progress events.
+ * onProgress(index, total, result) called for each file processed.
+ * Returns the final results array.
+ */
+async function uploadFileSSE(url, file, onProgress) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const resp = await fetch(url, { method: 'POST', body: formData });
+  if (!resp.ok) throw new Error(`Erreur serveur: ${resp.status}`);
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finalResults = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // Parse SSE events from buffer
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop(); // keep incomplete chunk
+
+    for (const part of parts) {
+      const line = part.trim();
+      if (!line.startsWith('data: ')) continue;
+      const json = line.slice(6);
+      try {
+        const event = JSON.parse(json);
+        if (event.type === 'progress' && onProgress) {
+          onProgress(event.index, event.total, event.result);
+        } else if (event.type === 'done') {
+          finalResults = event.results;
+        }
+      } catch (e) {
+        console.error('SSE parse error:', e);
+      }
+    }
+  }
+  return finalResults;
+}
+
+
 // ── PAGE-SPECIFIC LOGIC ──
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -263,9 +308,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files[0];
         if (!file) return;
         showLoading('loading-nouvelle', 'btn-export-nouvelle');
+        batchResults = [];
         try {
-          const data = await uploadFile('/api/batch', file);
-          batchResults = data.results;
+          const results = await uploadFileSSE('/api/batch', file, (index, total, result) => {
+            batchResults.push(result);
+            renderResultsList('results-nouvelle', batchResults);
+            updateStats(batchResults);
+          });
+          batchResults = results;
           renderResultsList('results-nouvelle', batchResults);
           updateStats(batchResults);
         } catch (err) {
@@ -295,9 +345,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files[0];
         if (!file) return;
         showLoading('loading-batch', 'btn-export-batch');
+        batchResults = [];
         try {
-          const data = await uploadFile('/api/batch', file);
-          batchResults = data.results;
+          const results = await uploadFileSSE('/api/batch', file, (index, total, result) => {
+            // Update progress bar
+            const pct = Math.round((index / total) * 100);
+            const bar = document.getElementById('progress-batch');
+            const txt = document.getElementById('progress-text-batch');
+            const traitees = document.getElementById('stat-traitees');
+            if (bar) bar.style.width = pct + '%';
+            if (txt) txt.textContent = pct + '%';
+            if (traitees) traitees.textContent = `${index} / ${total}`;
+
+            // Append result incrementally
+            batchResults.push(result);
+            renderResultsList('results-batch', batchResults);
+          });
+          batchResults = results;
           renderResultsList('results-batch', batchResults);
           updateBatchStats(batchResults);
           renderBatchTable('table-preview-batch', batchResults);
@@ -326,24 +390,67 @@ function renderResultsList(containerId, results) {
   if (!container) return;
   container.innerHTML = '';
 
+  // Update the count badge if present
+  const countEl = document.getElementById(containerId.replace('results-', 'results-count-'));
+  if (countEl) countEl.textContent = results.length;
+
   for (const res of results) {
     const isError = res.installateur === 'ERREUR';
     const isAvoir = res.is_avoir;
-
-    const div = document.createElement('div');
-    div.className = isAvoir
-      ? 'bg-tertiary-fixed/30 rounded-xl overflow-hidden border-l-4 border-tertiary mb-2'
-      : isError
-        ? 'bg-surface-container-lowest rounded-xl overflow-hidden border-l-4 border-error mb-2'
-        : 'bg-surface-container-lowest rounded-xl overflow-hidden mb-2';
 
     const icon = isError ? 'error' : 'check_circle';
     const iconColor = isError ? 'text-error' : 'text-green-600';
     const typeLabel = isAvoir ? 'AVOIR' : 'FACTURE';
     const typeBg = isAvoir ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant' : 'bg-blue-50 text-blue-700';
 
-    div.innerHTML = `
-      <div class="p-4 flex items-center justify-between hover:bg-surface-container-low cursor-pointer transition-colors">
+    const borderClass = isAvoir
+      ? 'border-l-4 border-tertiary bg-tertiary-fixed/30'
+      : isError
+        ? 'border-l-4 border-error bg-surface-container-lowest'
+        : 'bg-surface-container-lowest';
+
+    const details = document.createElement('details');
+    details.className = `${borderClass} rounded-xl overflow-hidden mb-2 group`;
+
+    // Build expanded field rows
+    let fieldsHtml = '';
+    if (isError) {
+      fieldsHtml = `<div class="p-4 bg-error-container/10 border border-error/20 rounded-xl">
+        <p class="text-xs font-bold text-error mb-1">Extraction echouee</p>
+        <p class="text-xs text-on-surface-variant">${res.source || 'Erreur inconnue'}</p>
+      </div>`;
+    } else {
+      const fields = res.fields || {};
+      const fieldDefs = [
+        ['NUMERO_FACTURE', 'Numero Facture'],
+        ['DATE_FACTURE', 'Date'],
+        ['MONTANT_HT', 'Montant HT'],
+        ['TAUX_TVA', 'TVA'],
+        ['MONTANT_TTC', 'Montant TTC'],
+        ['NOM_INSTALLATEUR', 'Installateur'],
+        ['COMMUNE_TRAVAUX', 'Commune'],
+        ['CODE_POSTAL', 'Code Postal'],
+        ['ADRESSE_TRAVAUX', 'Adresse'],
+      ];
+      const amountClass = isAvoir ? 'text-error font-bold' : '';
+      const isAmount = (k) => ['MONTANT_HT', 'MONTANT_TTC'].includes(k);
+
+      fieldsHtml = `<div class="grid grid-cols-3 gap-4">`;
+      for (const [key, label] of fieldDefs) {
+        const val = fields[key];
+        const displayVal = (!val || val === 'null' || val === 'None')
+          ? '<span class="text-error italic text-xs">Non detecte</span>'
+          : `<span class="${isAmount(key) && isAvoir ? amountClass : ''}">${val}</span>`;
+        fieldsHtml += `<div class="bg-surface-container-low p-3 rounded-lg">
+          <p class="text-[10px] font-bold text-on-surface-variant uppercase mb-1">${label}</p>
+          <p class="text-sm font-medium">${displayVal}</p>
+        </div>`;
+      }
+      fieldsHtml += `</div>`;
+    }
+
+    details.innerHTML = `
+      <summary class="list-none flex items-center justify-between p-4 cursor-pointer hover:bg-surface-container-low transition-colors">
         <div class="flex items-center gap-4">
           <span class="material-symbols-outlined ${iconColor}" style="font-variation-settings: 'FILL' 1;">${icon}</span>
           <div>
@@ -354,10 +461,14 @@ function renderResultsList(containerId, results) {
         <div class="flex items-center gap-4">
           <span class="text-[10px] px-2 py-0.5 rounded ${typeBg} font-bold">${typeLabel}</span>
           ${res.fields?.MONTANT_TTC ? `<span class="font-headline font-bold text-sm ${isAvoir ? 'text-error' : ''}">${res.fields.MONTANT_TTC} &euro;</span>` : ''}
+          <span class="material-symbols-outlined text-on-surface-variant transition-transform group-open:rotate-180">expand_more</span>
         </div>
+      </summary>
+      <div class="px-6 pb-4 pt-2">
+        ${fieldsHtml}
       </div>
     `;
-    container.appendChild(div);
+    container.appendChild(details);
   }
 }
 

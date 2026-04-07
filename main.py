@@ -22,19 +22,19 @@ async def root():
 
 @app.get("/texte")
 async def page_texte(request: Request):
-    return templates.TemplateResponse("texte.html", {"request": request, "active": "texte"})
+    return templates.TemplateResponse(request=request, name="texte.html", context={"active": "texte"})
 
 
 @app.get("/smart")
 async def page_smart(request: Request):
-    return templates.TemplateResponse("smart.html", {"request": request, "active": "smart"})
+    return templates.TemplateResponse(request=request, name="smart.html", context={"active": "smart"})
 
 
 @app.get("/nouvelle")
 async def page_nouvelle(request: Request):
-    return templates.TemplateResponse("nouvelle.html", {"request": request, "active": "nouvelle"})
+    return templates.TemplateResponse(request=request, name="nouvelle.html", context={"active": "nouvelle"})
 
 
 @app.get("/batch")
 async def page_batch(request: Request):
-    return templates.TemplateResponse("batch.html", {"request": request, "active": "batch"})
+    return templates.TemplateResponse(request=request, name="batch.html", context={"active": "batch"})
