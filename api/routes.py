@@ -1,5 +1,7 @@
-from fastapi import APIRouter, File, UploadFile, Form
-from fastapi.responses import StreamingResponse
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 import io
 import os
@@ -14,8 +16,17 @@ from core.extraction import (
 )
 from core.batch import iter_batch_zip, process_batch_zip
 from core.excel import export_excel_batch, export_excel_multi_sheets
+from core.prompts import PromptConfigError, reload as reload_prompts
 
 router = APIRouter(prefix="/api")
+
+
+def _require_localhost(request: Request):
+    """Minimal protection until chantier 3 (auth) ships. Replace with a real
+    auth dependency (Depends(current_admin_user)) when available."""
+    client_host = request.client.host if request.client else None
+    if client_host not in ("127.0.0.1", "::1"):
+        raise HTTPException(status_code=403, detail="Reload endpoint is localhost-only")
 
 
 @router.get("/fournisseurs")
@@ -92,3 +103,22 @@ async def api_export_excel_multi(data: ExportRequest):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=extraction_multi.xlsx"},
     )
+
+
+@router.post("/admin/reload-prompts", dependencies=[Depends(_require_localhost)])
+async def api_reload_prompts():
+    """Re-read config/prompts/*.yaml and swap the in-memory state. Returns 400
+    with the offending file name if validation fails (existing state preserved)."""
+    try:
+        summary = reload_prompts()
+    except PromptConfigError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "error": str(e)},
+        )
+    return {
+        "status": "ok",
+        "loaded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "prompts_count": summary["prompts_count"],
+        "files": summary["files"],
+    }

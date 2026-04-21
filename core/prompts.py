@@ -82,3 +82,25 @@ def _load_all() -> tuple[dict, str]:
 
 
 PROMPTS_INSTALLATEURS, PROMPT_TEXTE = _load_all()
+
+
+def reload() -> dict:
+    """Re-read config/prompts/*.yaml and swap the in-memory state atomically.
+
+    Returns a summary dict {"prompts_count": int, "files": list[str]} on success.
+    Raises PromptConfigError if the new state fails validation; in that case
+    PROMPTS_INSTALLATEURS and PROMPT_TEXTE remain unchanged (atomic-or-nothing).
+
+    Consumers that imported PROMPTS_INSTALLATEURS via `from core.prompts import ...`
+    will see the new content because the dict is mutated in place. Consumers of
+    PROMPT_TEXTE must access it via `core.prompts.PROMPT_TEXTE` (module attribute)
+    rather than re-binding it locally — see core/extraction.py for the pattern.
+    """
+    new_prompts, new_texte = _load_all()  # raises BEFORE any state mutation
+    PROMPTS_INSTALLATEURS.clear()
+    PROMPTS_INSTALLATEURS.update(new_prompts)
+    global PROMPT_TEXTE
+    PROMPT_TEXTE = new_texte
+
+    files = sorted(p.name for p in PROMPTS_DIR.glob("*.yaml"))
+    return {"prompts_count": len(PROMPTS_INSTALLATEURS), "files": files}

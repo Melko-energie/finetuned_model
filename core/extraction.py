@@ -12,7 +12,8 @@ import json
 import ollama
 
 from core.config import MODEL_NAME, OLLAMA_OPTIONS, ALL_FIELD_KEYS
-from core.prompts import PROMPTS_INSTALLATEURS, PROMPT_TEXTE
+from core import prompts as _prompts
+from core.prompts import PROMPTS_INSTALLATEURS  # mutable dict, safe to bind directly
 from core.detection import detect_installateur, detect_avoir
 from core.ocr import get_ocr_text, run_doctr_ocr
 from core.postprocess import (
@@ -69,7 +70,7 @@ def extract_from_precomputed_ocr(filename: str) -> dict:
         return {"fields": None, "error": "OCR introuvable pour cette facture", "is_avoir": False}
 
     is_avoir = detect_avoir(texte)
-    prompt = PROMPT_TEXTE.format(texte=texte[:3000])
+    prompt = _prompts.PROMPT_TEXTE.format(texte=texte[:3000])
     response = ollama.chat(
         model=MODEL_NAME,
         options=OLLAMA_OPTIONS,
