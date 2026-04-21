@@ -1,7 +1,7 @@
 """Field-by-field comparison between extracted and expected values."""
 
 from core.config import ALL_FIELD_KEYS
-from core.eval.normalize import normalize_basic
+from core.eval.normalize import normalize
 
 
 def compare_fields(extracted: dict | None, expected: dict) -> dict[str, str]:
@@ -22,8 +22,8 @@ def compare_fields(extracted: dict | None, expected: dict) -> dict[str, str]:
     for key in ALL_FIELD_KEYS:
         exp_raw = expected.get(key)
         ext_raw = extracted.get(key)
-        exp = normalize_basic(exp_raw)
-        ext = normalize_basic(ext_raw)
+        exp = normalize(exp_raw, key)
+        ext = normalize(ext_raw, key)
 
         if exp == "" and ext == "":
             verdicts[key] = "match"  # both empty = trivially correct
