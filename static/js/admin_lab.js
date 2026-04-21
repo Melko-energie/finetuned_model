@@ -37,6 +37,18 @@
   const btnModalCancel = $("btn-modal-cancel");
   const btnModalConfirm = $("btn-modal-confirm");
 
+  // Generate-from-samples modal (chantier 4.3)
+  const btnGenerate = $("btn-generate");
+  const modalGenerate = $("modal-generate");
+  const genForm = $("gen-form");
+  const genKey = $("gen-key");
+  const genPdfs = $("gen-pdfs");
+  const genPdfsList = $("gen-pdfs-list");
+  const genTruth = $("gen-truth");
+  const btnGenSubmit = $("btn-gen-submit");
+  const btnGenCancel = $("btn-gen-cancel");
+  const genLoading = $("gen-loading");
+
   // ─── Toast helper ───
   let toastTimer = null;
   function showToast(message, kind) {
@@ -287,8 +299,109 @@
     }
   }
 
+  // ─── Generate-from-samples flow (chantier 4.3) ───
+  function openGenerateModal() {
+    if (!confirmDiscardChanges()) return;
+    genKey.value = "";
+    genPdfs.value = "";
+    genTruth.value = "";
+    genPdfsList.innerHTML = "";
+    genLoading.classList.add("hidden");
+    btnGenSubmit.disabled = false;
+    modalGenerate.classList.remove("hidden");
+    setTimeout(() => genKey.focus(), 50);
+  }
+  function closeGenerateModal() {
+    modalGenerate.classList.add("hidden");
+  }
+  function updatePdfsList() {
+    const files = Array.from(genPdfs.files || []);
+    if (files.length === 0) {
+      genPdfsList.innerHTML = "";
+      return;
+    }
+    genPdfsList.innerHTML = files.map(f =>
+      `<li>• <span class="font-mono">${f.name}</span> <span class="text-on-surface-variant/70">(${Math.round(f.size / 1024)} KB)</span></li>`
+    ).join("");
+  }
+  async function submitGenerate(event) {
+    event.preventDefault();
+    const key = genKey.value.trim();
+    const pdfs = Array.from(genPdfs.files || []);
+    const truth = genTruth.files && genTruth.files[0];
+
+    if (!KEY_PATTERN.test(key)) {
+      showToast("Clé invalide : minuscules, chiffres, _ seulement, commence par une lettre.", "error");
+      return;
+    }
+    if (RESERVED_KEYS.has(key)) {
+      showToast(`'${key}' est une clé réservée.`, "error");
+      return;
+    }
+    if (pdfs.length < 2) {
+      showToast("Dépose au moins 2 factures échantillons.", "error");
+      return;
+    }
+    if (pdfs.length > 5) {
+      showToast("Maximum 5 factures échantillons.", "error");
+      return;
+    }
+    if (!truth) {
+      showToast("Fournis le fichier Excel ground truth.", "error");
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append("key", key);
+    for (const pdf of pdfs) fd.append("pdfs", pdf);
+    fd.append("truth_xlsx", truth);
+
+    btnGenSubmit.disabled = true;
+    genLoading.classList.remove("hidden");
+    try {
+      const res = await fetch("/api/admin/prompts/generate", { method: "POST", body: fd });
+      let data = null;
+      try { data = await res.json(); } catch (_) { /* non-json */ }
+      if (!res.ok) {
+        const detail = (data && (data.detail || data.error)) || `HTTP ${res.status}`;
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      }
+      closeGenerateModal();
+      loadDraft(data);
+      showToast(`Brouillon généré pour '${data.key}' — relis et sauvegarde.`, "ok");
+    } catch (e) {
+      showToast(`Erreur génération : ${e.message}`, "error");
+    } finally {
+      btnGenSubmit.disabled = false;
+      genLoading.classList.add("hidden");
+    }
+  }
+
+  function loadDraft(draft) {
+    state.currentKey = null;
+    state.isNew = true;
+    inputKey.disabled = false;
+    inputKey.value = draft.key;
+    inputDetecter.value = detecterToText(draft.detecter);
+    inputPrompt.value = draft.prompt;
+    typeBadge.textContent = "brouillon";
+    typeBadge.className = "inline-block mt-2 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-tertiary-container text-on-tertiary-container";
+    detecterSection.classList.remove("hidden");
+    btnDelete.classList.add("hidden");
+    state.lastLoaded = { detecter: inputDetecter.value, prompt: inputPrompt.value };
+    markDirty();
+    renderList(searchInput.value);
+    showEditor();
+  }
+
   // ─── Event wiring ───
   function onTextareaChange() {
+    // New prompts (from "+ Nouveau" or from a generated draft) are always
+    // dirty until saved — there's no server-side baseline to compare against.
+    if (state.isNew) {
+      if (!state.isDirty) markDirty();
+      return;
+    }
     const cur = { detecter: inputDetecter.value, prompt: inputPrompt.value };
     const changed = cur.detecter !== state.lastLoaded.detecter || cur.prompt !== state.lastLoaded.prompt;
     if (changed && !state.isDirty) markDirty();
@@ -305,6 +418,12 @@
   btnModalCancel.addEventListener("click", closeDeleteModal);
   btnModalConfirm.addEventListener("click", confirmDelete);
   searchInput.addEventListener("input", (e) => renderList(e.target.value));
+
+  // Generate-from-samples wiring (chantier 4.3)
+  btnGenerate.addEventListener("click", openGenerateModal);
+  btnGenCancel.addEventListener("click", closeGenerateModal);
+  genPdfs.addEventListener("change", updatePdfsList);
+  genForm.addEventListener("submit", submitGenerate);
 
   window.addEventListener("beforeunload", (e) => {
     if (state.isDirty) {
