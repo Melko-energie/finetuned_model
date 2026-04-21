@@ -32,6 +32,7 @@ data/ocr_texts/
 data/echantillon/
 data/installateurs*
 data/test_*
+data/eval_runs/
 
 # Claude Code local artefacts (specifiques machine, pas du projet)
 .agents/
