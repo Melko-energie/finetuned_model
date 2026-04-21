@@ -63,6 +63,28 @@ def extraire_champs(texte: str, installateur: str) -> dict:
         return {champ: None for champ in ALL_FIELD_KEYS}
 
 
+def extraire_champs_with_prompt(texte: str, prompt_text: str) -> dict:
+    """Run extraction using a prompt passed inline (not looked up by key).
+
+    Used by chantier 4.4 to self-test a generated draft before it's saved
+    to disk. No NVINS-specific address cleanup (new suppliers aren't NVINS).
+    The universal SIP HQ blacklist still applies.
+    """
+    prompt = prompt_text + texte
+    response = ollama.chat(
+        model=MODEL_NAME,
+        messages=[{"role": "user", "content": prompt}],
+        options=OLLAMA_OPTIONS,
+    )
+    raw = clean_json(response["message"]["content"])
+    try:
+        result = json.loads(raw)
+        result = verifier_coherence_montants(result)
+        return _apply_sip_cleanup(result)
+    except json.JSONDecodeError:
+        return {champ: None for champ in ALL_FIELD_KEYS}
+
+
 def extract_from_precomputed_ocr(filename: str) -> dict:
     """Pre-computed OCR + generic prompt. Returns {fields, error, is_avoir}."""
     texte = get_ocr_text(filename)

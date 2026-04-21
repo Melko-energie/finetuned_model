@@ -17,7 +17,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from core.eval.compare import compare_fields
 from core.eval.dataset import load_ground_truth
+from core.eval.metrics import aggregate
+from core.extraction import extraire_champs_with_prompt
 from core.ocr import run_doctr_ocr
 from core.prompt_gen import PromptGenerationError, generate_prompt_from_samples
 from core.prompts import PROMPTS_DIR, PromptConfigError, reload as reload_prompts
@@ -328,8 +331,30 @@ async def generate_prompt(
     except PromptGenerationError as e:
         raise HTTPException(status_code=500, detail=f"prompt generation failed: {e}")
 
+    # ── self-test: run extraction with the draft prompt on each sample ──
+    # This is a bonus; any failure here is non-fatal and the draft is still
+    # returned with self_test=null.
+    self_test = None
+    try:
+        per_pdf = []
+        for (uf, expected), sample in zip(samples_plan, samples):
+            extracted = extraire_champs_with_prompt(sample["ocr_text"], draft["prompt"])
+            verdicts = compare_fields(extracted, expected)
+            per_pdf.append({
+                "filename": uf.filename,
+                "verdicts": verdicts,
+            })
+        self_test = {
+            "metrics": aggregate(per_pdf),
+            "per_pdf": per_pdf,
+        }
+    except Exception as e:  # noqa: BLE001 — self-test is optional, never block
+        import logging
+        logging.warning(f"self-test failed after generation of '{key}': {e}")
+
     return {
         "key": key,
         "detecter": draft["detecter"],
         "prompt": draft["prompt"],
+        "self_test": self_test,
     }

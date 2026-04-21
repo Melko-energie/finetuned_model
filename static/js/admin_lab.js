@@ -49,6 +49,11 @@
   const btnGenCancel = $("btn-gen-cancel");
   const genLoading = $("gen-loading");
 
+  // Self-test panel (chantier 4.4)
+  const selfTestPanel = $("self-test-panel");
+  const selfTestGlobal = $("self-test-global");
+  const selfTestFields = $("self-test-fields");
+
   // ─── Toast helper ───
   let toastTimer = null;
   function showToast(message, kind) {
@@ -155,6 +160,7 @@
       state.currentKey = key;
       state.isNew = false;
       fillForm(data);
+      hideSelfTest();
       renderList(searchInput.value);
       showEditor();
     } catch (e) {
@@ -201,6 +207,7 @@
     btnDelete.classList.add("hidden");
     state.lastLoaded = { detecter: "", prompt: "" };
     clearDirty();
+    hideSelfTest();
     renderList(searchInput.value);
     showEditor();
     inputKey.focus();
@@ -232,6 +239,7 @@
         state.currentKey = created.key;
         await refreshList();
         fillForm(created);
+        hideSelfTest();
         showToast(`Prompt '${created.key}' créé.`, "ok");
       } else {
         const key = state.currentKey;
@@ -270,6 +278,7 @@
       state.currentKey = null;
       state.isNew = false;
       clearDirty();
+      hideSelfTest();
       hideEditor();
       await refreshList();
       showToast(`Prompt '${key}' supprimé.`, "ok");
@@ -284,6 +293,7 @@
       state.isNew = false;
       state.currentKey = null;
       clearDirty();
+      hideSelfTest();
       hideEditor();
       renderList(searchInput.value);
       return;
@@ -390,8 +400,61 @@
     btnDelete.classList.add("hidden");
     state.lastLoaded = { detecter: inputDetecter.value, prompt: inputPrompt.value };
     markDirty();
+    renderSelfTest(draft.self_test);
     renderList(searchInput.value);
     showEditor();
+  }
+
+  // ─── Self-test panel (chantier 4.4) ───
+  function renderSelfTest(selfTest) {
+    if (!selfTest || !selfTest.metrics) {
+      hideSelfTest();
+      return;
+    }
+    const metrics = selfTest.metrics;
+    const g = metrics.global || {};
+    const perField = metrics.per_field || {};
+
+    const globalAcc = (g.accuracy || 0) * 100;
+    selfTestGlobal.textContent = `Global : ${globalAcc.toFixed(1)}%  (${g.match || 0}/${g.total || 0} cells)`;
+    selfTestGlobal.className = "text-sm font-bold " + accClass(g.accuracy || 0);
+
+    selfTestFields.innerHTML = "";
+    for (const field of Object.keys(perField)) {
+      const c = perField[field];
+      const acc = c.accuracy || 0;
+      const pct = acc * 100;
+      const bar = renderBar(acc);
+      const row = document.createElement("div");
+      row.className = "grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center";
+      row.innerHTML = `
+        <span class="font-mono text-on-surface-variant">${field}</span>
+        <span class="font-mono ${accClass(acc)}">${bar}</span>
+        <span class="font-mono ${accClass(acc)}">${pct.toFixed(0)}%</span>
+        <span class="text-on-surface-variant/70">(${c.match || 0}/${c.total || 0})</span>
+      `;
+      selfTestFields.appendChild(row);
+    }
+
+    selfTestPanel.classList.remove("hidden");
+  }
+
+  function hideSelfTest() {
+    selfTestPanel.classList.add("hidden");
+    selfTestFields.innerHTML = "";
+    selfTestGlobal.textContent = "";
+  }
+
+  function accClass(acc) {
+    if (acc >= 0.9) return "text-[#2e7d32]";
+    if (acc >= 0.6) return "text-[#e65100]";
+    return "text-error";
+  }
+
+  function renderBar(acc) {
+    const width = 10;
+    const filled = Math.round(acc * width);
+    return "█".repeat(filled) + "░".repeat(width - filled);
   }
 
   // ─── Event wiring ───
