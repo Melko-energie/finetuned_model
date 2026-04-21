@@ -40,3 +40,8 @@ async def page_nouvelle(request: Request):
 @app.get("/batch")
 async def page_batch(request: Request):
     return templates.TemplateResponse(request=request, name="batch.html", context={"active": "batch"})
+
+
+@app.get("/admin")
+async def page_admin(request: Request):
+    return templates.TemplateResponse(request=request, name="admin.html", context={"active": "admin"})

@@ -98,6 +98,10 @@ body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; min-height: 
         <span class="material-symbols-outlined text-xl" {% if active == 'batch' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>layers</span>
         <span>Traitement par lot</span>
       </a>
+      <a href="/admin" class="flex items-center gap-3 px-4 py-3 {% if active == 'admin' %}bg-white text-[#003d9b] font-bold border-r-4 border-[#003d9b]{% else %}text-slate-600 hover:bg-slate-200/50 hover:translate-x-1 transition-transform duration-200{% endif %} text-sm font-medium tracking-normal">
+        <span class="material-symbols-outlined text-xl" {% if active == 'admin' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>tune</span>
+        <span>Admin (prompts)</span>
+      </a>
     </nav>
     <div class="mt-auto px-4 pb-4">
       <span class="text-[10px] font-bold text-slate-400 tracking-widest">VERSION v3.0.0</span>
