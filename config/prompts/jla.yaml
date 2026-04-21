@@ -1,0 +1,43 @@
+detecter:
+- sarl j.l.a
+- sarl jla
+- j.l.a
+- cboisdanghein@sfr
+- '88883273000012'
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une facture de SARL J.L.A (rénovation/bâtiment, Saint-Sauveur).
+
+  PARTICULARITÉS J.L.A :
+  - NUMERO_FACTURE : après "Référence :" (format 8 chiffres, ex: "00000232", "00000302").
+  - DATE_FACTURE : dans la ligne "SAINT SAUVEUR, le DD mois AAAA" (ex: "SAINT SAUVEUR, le 04 octobre 2022" → "04/10/2022"). Format JJ/MM/AAAA.
+  - MONTANT_HT : après "Total H.T." en bas de page (dernière page si multi-pages). Attention : séparateur de milliers = espace (ex: "1 776,00" → "1776.00"). Séparateur décimal = virgule → convertir en point.
+  - TAUX_TVA : après "Total T.V.A." (ex: "20,00 %" → "20%").
+  - MONTANT_TTC : après "Net à payer (Euros)" (ex: "2 131,20" → "2131.20"). Même règle : espace = milliers, virgule = décimal → convertir en point.
+  - NOM_INSTALLATEUR : toujours "SARL J.L.A".
+  - ADRESSE_TRAVAUX : dans la ligne "Objet :" qui contient la description des travaux ET l'adresse du chantier. Extraire UNIQUEMENT la partie adresse (rue + commune). IGNORER la description des travaux et le code "BT AAAA NNNN" (bon de travaux) en fin de ligne.
+    Exemples :
+    * "REPRISE DES TAPIS DE SOL PLACE DE LA LOGETTE A CORBIE BT 2022 6744" → ADRESSE_TRAVAUX = "PLACE DE LA LOGETTE", COMMUNE = "CORBIE"
+    * "TRAVAUX D'ISOLATION CHANTIER SITUE RUE DES 17 COQUELICOTS A FRIVILLE ESCARBOTIN BT 2023 1760" → ADRESSE_TRAVAUX = "RUE DES 17 COQUELICOTS", COMMUNE = "FRIVILLE ESCARBOTIN"
+  - COMMUNE_TRAVAUX : la ville après la dernière occurrence de "A" ou "À" dans la ligne Objet (avant "BT"). Voir exemples ci-dessus.
+  - CODE_POSTAL : souvent absent dans la facture J.L.A. Mettre null si non visible.
+  IGNORER ABSOLUMENT :
+    * Adresse J.L.A : "635 Rue Maurice Thorez", "80470 SAINT SAUVEUR" — c'est l'entreprise.
+    * Adresse client SIP : "13 PLACE D'AGUESSEAU", "80000 AMIENS" — c'est le siège social SIP (blacklisté).
+  - SIRET : 88883273000012 / APE 4120A
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

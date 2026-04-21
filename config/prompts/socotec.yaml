@@ -1,0 +1,36 @@
+detecter:
+- socotec
+- construction.amiens@socotec
+- '83415751300922'
+- socotec construction
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une facture/avoir de SOCOTEC Construction (contrôle technique).
+
+  PARTICULARITÉS SOCOTEC :
+  - Numéro format "2208000011/151V0" (AAMM + séquence / code affaire)
+  - TVA : 20%
+  - Montants : cherche "Total" avec HT / TVA / TTC en EUR, puis "A REGLER"
+  - Installateur : SOCOTEC Construction (SAS), agence 1 allée de la Pépinière, 80480 DURY
+  - ADRESSE_TRAVAUX / COMMUNE_TRAVAUX / CODE_POSTAL : chercher dans le bloc "Adresses de visite liées aux lignes de facture" (souvent en page 2, libellé parfois garblé par l'OCR en "Adressesdecsitoleeseuglgnesdolecturo" ou "Reutfonsléesauslignesdolactures"). Juste en-dessous, la ligne commence par un numéro d'ordre puis le nom du client ("SOCIETE IMMOBILIERE PICARDE D'HLM -LOGEMENT") suivi de la VRAIE adresse d'intervention (ex: "15 RUE LEMERCHIER") puis "CP COMMUNE" (ex: "80000 AMIENS France").
+    IGNORER ABSOLUMENT :
+      * Adresse client / facturation en haut : "13 PL D'AGUESSEAU", "131 PL D'AGUESSEAU", "80000 AMIENS" associé au client — c'est le SIÈGE SIP, JAMAIS un chantier.
+      * Adresse agence SOCOTEC : "1 allée de la Pépinière", "Centre Oasis La Passiflore", "80480 DURY".
+      * Siège SOCOTEC : "5 place des Frères Montgolfier", "CS 20732", "Guyancourt", "78182", "Saint-Quentin-en-Yvelines".
+    Si plusieurs adresses de visite sont listées, concaténer ADRESSE_TRAVAUX / COMMUNE_TRAVAUX / CODE_POSTAL séparés par " | ".
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

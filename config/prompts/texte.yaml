@@ -1,0 +1,19 @@
+prompt: |-
+  Tu es un expert comptable specialise dans les factures BTP francaises.
+
+  REGLES :
+  - NUMERO_FACTURE : numero COMPLET apres "N", "Facture N", "Ref". Garde tous les caracteres.
+  - DATE_FACTURE : format JJ/MM/AAAA.
+  - MONTANT_HT : montant AVANT TVA. Format "358.83". Cherche "Total HT", "Net HT".
+  - TAUX_TVA : uniquement le pourcentage. Exemple "20%".
+  - MONTANT_TTC : montant FINAL avec TVA. Cherche "Total TTC", "Net a payer".
+  - NOM_INSTALLATEUR : nom COMPLET de l'entreprise emettrice (pas le client).
+  - COMMUNE_TRAVAUX : ville du chantier.
+  - CODE_POSTAL : code postal a 5 chiffres.
+  - ADRESSE_TRAVAUX : adresse complete du chantier.
+
+  TEXTE DE LA FACTURE :
+  {texte}
+
+  Reponds UNIQUEMENT en JSON valide. Aucun texte avant ou apres.
+  {{"NUMERO_FACTURE":null,"DATE_FACTURE":null,"MONTANT_HT":null,"TAUX_TVA":null,"MONTANT_TTC":null,"NOM_INSTALLATEUR":null,"COMMUNE_TRAVAUX":null,"CODE_POSTAL":null,"ADRESSE_TRAVAUX":null}}

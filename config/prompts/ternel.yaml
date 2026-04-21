@@ -1,0 +1,33 @@
+detecter:
+- ternel
+- ternelcouverture
+- ternel couverture
+- '45009851200038'
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une facture de Ternel Couverture (charpente/zinguerie, Albert).
+
+  PARTICULARITÉS TERNEL :
+  - Numéro facture : 8 chiffres (ex: "00002810")
+  - TVA MIXTE : peut avoir 20% ET 5,5% sur la même facture. Indique les deux taux séparés par "/"
+  - Montants : récapitulatif en bas. Cherche "Total H.T.", "TVA1: 20%", "TVA2: 5,5%", "Total T.T.C.", "Net a payer"
+  - MONTANT_HT : prendre UNIQUEMENT le montant à côté de "Total H.T." ou "TOTAL HT". IGNORER "Sous-total", acomptes, cumuls.
+  - MONTANT_TTC : prendre UNIQUEMENT le montant à côté de "Total T.T.C." ou "TOTAL TTC". IGNORER sous-totaux TTC.
+  - Installateur : Ternel Couverture, 8 rue de l'industrie, 80300 ALBERT
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Pour TAUX_TVA avec taux multiples, indique "20% / 5.5%".
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

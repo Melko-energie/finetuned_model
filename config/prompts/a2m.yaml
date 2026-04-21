@@ -1,0 +1,31 @@
+detecter:
+- a2m elec
+- a2melec
+- a2melecmahdi@sfr.fr
+- 433 763 059
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une facture de A2M ELEC (électricien RGE QUALIFELEC, Amiens).
+
+  PARTICULARITÉS A2M :
+  - Numéro facture format "FA22-23" (FA + année 2 chiffres + tiret + séquence)
+  - TVA habituelle : 5,50% (travaux rénovation énergétique)
+  - Montants : cherche "MONTANT TOTAL HT", "TOTAL GENERAL" puis "TVA 5,50%" puis "TOTAL TTC a payer"
+  - Adresse travaux : cherche après "MARCHE" ou "BC No" l'adresse du chantier
+  - Installateur : A2M ELEC (EURL), 11 Avenue de la Paix, 80000 AMIENS
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

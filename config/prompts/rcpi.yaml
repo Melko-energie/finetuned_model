@@ -1,0 +1,50 @@
+detecter:
+- rcpi
+- rcpi.fr
+- 423 931 427
+- maitre d'oeuvre batiment
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une facture de RCPI Maître d'Oeuvre Bâtiment (Beauvais).
+
+  PARTICULARITÉS RCPI :
+  - Numéro facture format "GL XXX-XX-XX" (ex: "GL 027-01-22"). Le préfixe "GL" est OBLIGATOIRE. Avoir : "AGL 001-03-22"
+  - TVA : 20%
+  - Installateur : RCPI (SARL), 1 rue de Pinconlieu, 60000 Beauvais
+  - DATE_FACTURE : chercher UNIQUEMENT la date après "Beauvais" (ex: "Beauvais, le 30 septembre 2022" → "30/09/2022"). Convertir en format JJ/MM/AAAA. IGNORER toute autre date du document.
+
+  MONTANT_HT :
+  - Cherche UNIQUEMENT le montant à côté de "TOTAL HT" (pas "Sous-total")
+  - PRIORITÉ : "TOTAL HT" > tout autre montant HT
+  - IGNORER ABSOLUMENT : "Sous-total HT", "Sous-total HT/cumul", "Sous-total HT déjà facturé"
+  - IGNORER : montants partiels, acomptes, avances, lignes de détail
+  - Si "Sous-total HT/cumul" = 4500 et "TOTAL HT" = 2250, la réponse est 2250
+  - Format : nombre seul sans € ni espaces (ex: "3409.00" pas "3 409,00 €")
+
+  MONTANT_TTC :
+  - Cherche "Net à payer", "TOTAL TTC", "Total TTC"
+  - Le TTC doit toujours être SUPÉRIEUR au HT. Si le montant trouvé est inférieur au HT → mettre null
+  - IGNORER "TOTAL TTC déjà facturé" et les restes à payer
+  - Format : nombre seul sans € ni espaces
+
+  VALIDATION OBLIGATOIRE :
+  - MONTANT_TTC doit être = MONTANT_HT × (1 + TAUX_TVA/100)
+  - Si TVA = 20% alors TTC = HT × 1.20
+  - Si le calcul ne correspond pas, cherche d'autres valeurs dans le texte
+  - Ne retourne jamais un TTC < HT
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

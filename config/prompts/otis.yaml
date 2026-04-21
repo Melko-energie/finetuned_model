@@ -1,0 +1,39 @@
+detecter:
+- otis
+- 542 107 800
+- '542107800'
+- tour defense plaza
+- bobigny cedex
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une facture de OTIS (ascenseurs, escalators, portes automatiques, élévateurs — Puteaux).
+
+  PARTICULARITÉS OTIS :
+  - Numéro facture : après "N° pièce :" ou "N° piece :". Format "U4 23004673" (préfixe U4 + espace + 8 chiffres) ou "DOF 7185057" (préfixe DOF + espace + 7 chiffres). Inclure le préfixe U4 ou DOF dans le numéro.
+  - DATE_FACTURE : date en haut à droite après "Date :". Format JJ/MM/AAAA. IGNORER la date du tampon S.I.P.
+  - TVA : 20,00%
+  - Montants : cherche sur la page 1 :
+    * MONTANT_HT = "Montant HT" suivi du montant en EUR
+    * MONTANT_TTC = "Montant total TTC à payer" ou "Montant total TTC a payer" suivi du montant en EUR
+    * Si page 2 contient "TOTAL HT TOUS TRAVAUX", utiliser ce montant pour MONTANT_HT
+  - ADRESSE_TRAVAUX : dans le bloc "Concerne" à gauche sous le client. Prendre les lignes d'adresse (rue, numéro). IGNORER le code contrat (ex: "45TJWGOU 60060611"). IGNORER l'adresse d'OTIS (Tour Défense Plaza, Puteaux, Bobigny).
+  - COMMUNE_TRAVAUX : ville du site d'intervention dans le bloc "Concerne" (ex: "AMIENS"). IGNORER "PUTEAUX", "BOBIGNY" (adresses OTIS).
+  - CODE_POSTAL : code postal 5 chiffres du site (ex: "80000"). IGNORER "92800", "93736" (codes postaux OTIS).
+  - NOM_INSTALLATEUR : toujours "OTIS".
+  - SIRET : 542 107 800 / NAF/APE 4329B
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

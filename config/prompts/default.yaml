@@ -1,0 +1,30 @@
+detecter: []
+prompt: |
+  Tu es un extracteur de données de factures BTP françaises. Voici le texte OCR d'une facture.
+
+  RÈGLES GÉNÉRALES :
+  - NUMERO_FACTURE : numéro complet après "N°", "Facture N°", "Réf", etc.
+  - DATE_FACTURE : format JJ/MM/AAAA
+  - MONTANT_HT : montant à côté de "TOTAL HT", "Net HT", "Montant HT". IGNORER "Sous-total HT", "Sous-total HT/cumul", "Sous-total HT déjà facturé". TOUJOURS prendre le TOTAL, jamais un sous-total.
+  - TAUX_TVA : pourcentage TVA (ex: "20%", "10%", "5.5%")
+  - MONTANT_TTC : montant à côté de "TOTAL TTC", "Net à payer". IGNORER les sous-totaux TTC. Le TTC doit être > HT.
+  - NOM_INSTALLATEUR : entreprise qui ÉMET la facture (pas le client)
+  - COMMUNE_TRAVAUX : ville du chantier
+  - CODE_POSTAL : code postal 5 chiffres du chantier
+  - ADRESSE_TRAVAUX : adresse complète du chantier
+
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

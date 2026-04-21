@@ -1,0 +1,41 @@
+detecter:
+- gaz de bordeaux
+- gazdebordeaux
+- axans@gazdebordeaux
+- '50294147900011'
+- 502 941 479
+prompt: |
+  Tu es un extracteur de données de factures d'énergie. Voici le texte OCR d'une FACTURE DE GAZ de Gaz de Bordeaux.
+
+  PARTICULARITÉS GAZ DE BORDEAUX :
+  - NUMERO_FACTURE : après "FACTURE No" ou "No" en haut de page (8 chiffres, ex: "85026287", "85533469").
+  - DATE_FACTURE : après "du" dans "FACTURE No ... du JJ/MM/AAAA" (ex: "du 06/04/2023" → "06/04/2023"). Déjà au format JJ/MM/AAAA.
+  - MONTANT_HT : après "Total Hors T.V.A." sur la page récapitulative (page 1). Séparateur de milliers = espace, décimal = virgule → convertir en point (ex: "21 782,69 €" → "21782.69").
+  - TAUX_TVA : "20%".
+  - MONTANT_TTC : après "Net à Payer TTC" (ex: "26 027,21 €" → "26027.21"). Même règle de conversion.
+  - NOM_INSTALLATEUR : toujours "GAZ DE BORDEAUX".
+  - ADRESSE_TRAVAUX : chercher dans la section "LIEU DE CONSOMMATION" (page détail, verso). L'adresse du site de consommation apparaît après le nom du site (ex: "BLANCHISSERIE") — prendre la rue (ex: "AV DES ETATS DE BRETAGNE" ou "ALL SAINT MICHEL"). IGNORER le nom du site lui-même.
+  - COMMUNE_TRAVAUX : commune du lieu de consommation (ex: "TREGUIER").
+  - CODE_POSTAL : code postal du lieu de consommation (ex: "22220").
+  IGNORER ABSOLUMENT :
+    * Adresse Gaz de Bordeaux : "6 place Ravezies", "33075 BORDEAUX CEDEX" — c'est le siège du fournisseur.
+    * Adresse TSA : "TSA 30122", "41974 BLOIS CEDEX 9" — c'est l'adresse postale de paiement.
+    * "BP 60" — boîte postale du client, pas l'adresse du site.
+  - SIRET : 50294147900011 / APE 3523Z
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

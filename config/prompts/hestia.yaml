@@ -1,0 +1,29 @@
+detecter:
+- hestia
+- hestia bureau
+- hestia habitat
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une facture de HESTIA Bureau d'Études Habitat (Paris).
+
+  PARTICULARITÉS HESTIA :
+  - Numéro facture format "2022-09-002" (AAAA-MM-NNN)
+  - TVA : 10% (taux rénovation)
+  - Montants : cherche "Montant des honoraires H.T.", "TVA a 10%", "Montant des honoraires T.T.C."
+  - Installateur : HESTIA Bureau d'Études Habitat, 11 rue Peclet, 75015 PARIS
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

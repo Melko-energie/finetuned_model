@@ -1,0 +1,33 @@
+detecter:
+- bet poulain
+- bet.poulain
+- bet philippe poulain
+- b.e.t. philippe poulain
+- b.e.t. poulain
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une DEMANDE D'HONORAIRES de B.E.T. PHILIPPE POULAIN (études thermiques, Amiens).
+
+  PARTICULARITÉS POULAIN :
+  - Document intitulé "DEMANDE D'HONORAIRES"
+  - Numéro format "2129 - 702" (séquence - sous-numéro)
+  - TVA : 20%
+  - Montants : tableau de phases (DIAG/PLAN/ET) avec avancement. Cherche "€ HT", "TVA", "€ TTC" ou "Taux de TVA: 20%"
+  - MONTANT_HT : prendre UNIQUEMENT le dernier Total HT affiché. Ignorer acomptes et sous-totaux.
+  - Installateur : B.E.T. PHILIPPE POULAIN, 123 boulevard de Strasbourg, 80000 AMIENS
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :
