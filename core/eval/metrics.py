@@ -50,3 +50,16 @@ def aggregate(per_pdf: list[dict]) -> dict:
             "accuracy_macro": macro,
         },
     }
+
+
+def aggregate_by_supplier(per_pdf: list[dict]) -> dict[str, dict]:
+    """Group per-PDF verdicts by detected installateur and compute
+    per-group metrics (same shape as `aggregate`)."""
+    groups: dict[str, list[dict]] = {}
+    for row in per_pdf:
+        supplier = (row.get("installateur") or "unknown").lower()
+        groups.setdefault(supplier, []).append(row)
+    return {
+        supplier: {**aggregate(rows), "n_pdfs": len(rows)}
+        for supplier, rows in groups.items()
+    }

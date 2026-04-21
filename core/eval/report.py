@@ -37,6 +37,26 @@ def render_terminal(result: dict) -> None:
     print()
     print(f"  Global micro accuracy: {g['accuracy']*100:5.1f}%   ({g['match']} / {g['total']} cells)")
     print(f"  Global macro accuracy: {g['accuracy_macro']*100:5.1f}%   (mean of per-field)")
+
+    by_supplier = result.get("metrics_by_supplier") or {}
+    if by_supplier:
+        print()
+        print("  Per-supplier accuracy (worst first):")
+        print()
+        # Sort by micro accuracy ASC
+        sorted_items = sorted(
+            by_supplier.items(),
+            key=lambda kv: kv[1]["global"]["accuracy"],
+        )
+        max_name = max(len(s) for s in by_supplier.keys())
+        for supplier, m in sorted_items:
+            gg = m["global"]
+            acc = gg["accuracy"]
+            bar = _bar(acc, width=10)
+            print(f"    {supplier:<{max_name}}  {bar}  {acc*100:5.1f}%   "
+                  f"({gg['match']:>3} / {gg['total']:>3} cells)   "
+                  f"({m['n_pdfs']} PDFs)")
+
     print("=" * 62)
 
 

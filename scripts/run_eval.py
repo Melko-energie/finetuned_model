@@ -16,6 +16,12 @@ from core.eval.runner import run_eval
 
 
 def main():
+    # Force UTF-8 stdout so Unicode bar chars render on Windows cp1252 terminals.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
     parser = argparse.ArgumentParser(
         description="Evaluate extraction quality against a ground-truth Excel."
     )

@@ -10,7 +10,7 @@ from tqdm import tqdm
 from core.config import MODEL_NAME
 from core.eval.compare import compare_fields
 from core.eval.dataset import index_pdfs, load_ground_truth, match_pdf
-from core.eval.metrics import aggregate
+from core.eval.metrics import aggregate, aggregate_by_supplier
 from core.extraction import extract_smart, process_file_live
 
 
@@ -85,6 +85,7 @@ def run_eval(pdfs_dir: Path, truth_file: Path) -> dict:
         },
         "per_pdf": per_pdf,
         "metrics": aggregate(per_pdf),
+        "metrics_by_supplier": aggregate_by_supplier(per_pdf),
     }
     return result
 
