@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from pathlib import Path
 
+from api.admin import router as admin_router
 from api.routes import router as api_router
 
 app = FastAPI(title="Extraction de Factures BTP")
@@ -13,6 +14,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 app.include_router(api_router)
+app.include_router(admin_router)
 
 
 @app.get("/")
