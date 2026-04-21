@@ -10,12 +10,10 @@ from core.extraction import (
     extract_from_precomputed_ocr,
     extract_smart,
     process_file_live,
-    process_batch_zip,
-    iter_batch_zip,
-    export_excel_batch,
-    export_excel_multi_sheets,
     get_fournisseurs_list,
 )
+from core.batch import iter_batch_zip, process_batch_zip
+from core.excel import export_excel_batch, export_excel_multi_sheets
 
 router = APIRouter(prefix="/api")
 
