@@ -47,3 +47,8 @@ async def page_batch(request: Request):
 @app.get("/admin")
 async def page_admin(request: Request):
     return templates.TemplateResponse(request=request, name="admin.html", context={"active": "admin"})
+
+
+@app.get("/admin-lab")
+async def page_admin_lab(request: Request):
+    return templates.TemplateResponse(request=request, name="admin_lab.html", context={"active": "admin-lab"})
