@@ -55,19 +55,27 @@
 
   <!-- History (chantier 5.2) -->
   <section id="history-section" class="hidden bg-white rounded-xl p-5 border border-outline-variant/50">
-    <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
       <div class="flex items-center gap-2">
         <span class="material-symbols-outlined text-primary">history</span>
         <span class="font-medium text-sm">Runs passés</span>
         <span id="history-count" class="text-xs text-on-surface-variant"></span>
       </div>
-      <button id="btn-refresh-history" type="button" class="text-xs text-primary hover:underline">Rafraîchir</button>
+      <div class="flex items-center gap-3">
+        <span id="diff-hint" class="text-[11px] text-on-surface-variant">Coche 2 runs pour les comparer.</span>
+        <button id="btn-diff" type="button" disabled class="bg-primary text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 shadow-sm hover:bg-primary-container disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <span class="material-symbols-outlined text-sm">compare_arrows</span>
+          Comparer
+        </button>
+        <button id="btn-refresh-history" type="button" class="text-xs text-primary hover:underline">Rafraîchir</button>
+      </div>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-xs">
         <thead class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest border-b border-outline-variant/50">
           <tr>
-            <th class="text-left py-2 pl-2">ID</th>
+            <th class="text-center py-2 pl-2 w-8"><span class="sr-only">Sélection</span></th>
+            <th class="text-left py-2">ID</th>
             <th class="text-left py-2">Démarré (UTC)</th>
             <th class="text-left py-2">Dataset</th>
             <th class="text-right py-2">Accuracy</th>
@@ -133,6 +141,53 @@
     <div>
       <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Par fournisseur (pires en premier)</div>
       <div id="per-supplier-list" class="space-y-1 text-xs"></div>
+    </div>
+  </section>
+
+  <!-- Diff (chantier 5.3) -->
+  <section id="diff-section" class="hidden bg-white rounded-xl p-6 border border-outline-variant/50 space-y-6">
+    <div class="flex items-start justify-between">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary">compare_arrows</span>
+        <h3 id="diff-title" class="font-headline text-lg font-bold text-on-surface"></h3>
+      </div>
+      <button id="btn-close-diff" type="button" class="text-on-surface-variant hover:text-on-surface" aria-label="Fermer">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <!-- Global deltas -->
+    <div class="grid grid-cols-2 gap-4">
+      <div id="diff-global-micro" class="bg-surface-container-low rounded-lg p-4"></div>
+      <div id="diff-global-macro" class="bg-surface-container-low rounded-lg p-4"></div>
+    </div>
+
+    <!-- Per-field -->
+    <div>
+      <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Par champ</div>
+      <div id="diff-per-field" class="space-y-1 text-xs"></div>
+    </div>
+
+    <!-- Per-supplier (shared) -->
+    <div>
+      <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Par fournisseur (présents dans les deux runs)</div>
+      <div id="diff-per-supplier" class="space-y-1 text-xs"></div>
+    </div>
+
+    <!-- Regressions + Improvements -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2 border-t border-outline-variant/50">
+      <div>
+        <div class="text-[10px] font-bold text-error uppercase tracking-widest mb-2">
+          Régressions <span id="regressions-count" class="text-on-surface-variant font-normal normal-case"></span>
+        </div>
+        <div id="regressions-list" class="space-y-1 text-xs font-mono"></div>
+      </div>
+      <div>
+        <div class="text-[10px] font-bold text-[#2e7d32] uppercase tracking-widest mb-2">
+          Améliorations <span id="improvements-count" class="text-on-surface-variant font-normal normal-case"></span>
+        </div>
+        <div id="improvements-list" class="space-y-1 text-xs font-mono"></div>
+      </div>
     </div>
   </section>
 </div>

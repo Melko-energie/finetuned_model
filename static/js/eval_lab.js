@@ -37,6 +37,22 @@
   const historyTbody = $("history-tbody");
   const btnRefreshHistory = $("btn-refresh-history");
 
+  // Diff (chantier 5.3)
+  const btnDiff = $("btn-diff");
+  const btnCloseDiff = $("btn-close-diff");
+  const diffSection = $("diff-section");
+  const diffTitle = $("diff-title");
+  const diffGlobalMicro = $("diff-global-micro");
+  const diffGlobalMacro = $("diff-global-macro");
+  const diffPerField = $("diff-per-field");
+  const diffPerSupplier = $("diff-per-supplier");
+  const regressionsList = $("regressions-list");
+  const regressionsCount = $("regressions-count");
+  const improvementsList = $("improvements-list");
+  const improvementsCount = $("improvements-count");
+
+  state.selectedRuns = new Set();
+
   let toastTimer = null;
   function showToast(message, kind) {
     toast.textContent = message;
@@ -195,7 +211,10 @@
       const dur = Math.round(run.duration_seconds || 0);
       const durStr = dur < 60 ? `${dur}s` : `${Math.floor(dur / 60)}m ${dur % 60}s`;
       tr.innerHTML = `
-        <td class="py-2 pl-2 font-mono">${run.id}</td>
+        <td class="py-2 pl-2 text-center">
+          <input type="checkbox" class="run-checkbox" data-run-id="${run.id}"/>
+        </td>
+        <td class="py-2 font-mono">${run.id}</td>
         <td class="py-2 text-on-surface-variant">${started}</td>
         <td class="py-2 text-on-surface-variant font-mono">${datasetShort}</td>
         <td class="py-2 text-right font-bold ${accClass(acc)}">${(acc * 100).toFixed(1)}%</td>
@@ -210,6 +229,11 @@
     for (const btn of historyTbody.querySelectorAll(".btn-view-run")) {
       btn.addEventListener("click", () => viewRun(btn.dataset.runId));
     }
+    for (const cb of historyTbody.querySelectorAll(".run-checkbox")) {
+      if (state.selectedRuns.has(cb.dataset.runId)) cb.checked = true;
+      cb.addEventListener("change", onRunSelectionChange);
+    }
+    updateDiffButton();
   }
 
   async function viewRun(runId) {
@@ -237,6 +261,148 @@
   }
 
   btnRefreshHistory.addEventListener("click", refreshHistory);
+
+  // ─── Diff (chantier 5.3) ───
+  function onRunSelectionChange(event) {
+    const cb = event.target;
+    const id = cb.dataset.runId;
+    if (cb.checked) state.selectedRuns.add(id);
+    else state.selectedRuns.delete(id);
+    updateDiffButton();
+  }
+
+  function updateDiffButton() {
+    btnDiff.disabled = state.selectedRuns.size !== 2;
+  }
+
+  async function submitDiff() {
+    if (state.selectedRuns.size !== 2) return;
+    // Sort by ID (timestamp-prefixed) so 'a' is older, 'b' is newer.
+    const [a, b] = [...state.selectedRuns].sort();
+    btnDiff.disabled = true;
+    try {
+      const res = await fetch(`/api/admin/eval/runs/${encodeURIComponent(a)}/diff/${encodeURIComponent(b)}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const detail = (body && (body.detail || body.error)) || `HTTP ${res.status}`;
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      }
+      const diff = await res.json();
+      renderDiff(diff, a, b);
+      diffSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (e) {
+      showToast(`Erreur comparaison : ${e.message}`, "error");
+    } finally {
+      updateDiffButton();
+    }
+  }
+
+  function arrow(delta) {
+    if (delta > 0.05) return "↑↑";
+    if (delta > 0.005) return "↑";
+    if (delta < -0.05) return "↓↓";
+    if (delta < -0.005) return "↓";
+    return "=";
+  }
+  function deltaClass(delta) {
+    if (delta > 0.005) return "text-[#2e7d32]";
+    if (delta < -0.005) return "text-error";
+    return "text-on-surface-variant";
+  }
+  function fmtPct(x) { return ((x || 0) * 100).toFixed(1) + "%"; }
+  function fmtPp(d)  { return (d >= 0 ? "+" : "") + ((d || 0) * 100).toFixed(1) + "pp"; }
+
+  function renderDiff(diff, aId, bId) {
+    diffTitle.textContent = `Diff : ${aId}  →  ${bId}`;
+
+    const g = diff.global || {};
+    const micro = g.micro || { a: 0, b: 0, delta: 0 };
+    const macro = g.macro || { a: 0, b: 0, delta: 0 };
+    diffGlobalMicro.innerHTML = `
+      <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Global micro</div>
+      <div class="font-headline text-2xl font-extrabold mt-1">${fmtPct(micro.a)} → ${fmtPct(micro.b)}</div>
+      <div class="text-sm font-bold ${deltaClass(micro.delta)} mt-1">${fmtPp(micro.delta)}  ${arrow(micro.delta)}</div>
+    `;
+    diffGlobalMacro.innerHTML = `
+      <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Global macro</div>
+      <div class="font-headline text-2xl font-extrabold mt-1">${fmtPct(macro.a)} → ${fmtPct(macro.b)}</div>
+      <div class="text-sm font-bold ${deltaClass(macro.delta)} mt-1">${fmtPp(macro.delta)}  ${arrow(macro.delta)}</div>
+    `;
+
+    diffPerField.innerHTML = "";
+    for (const field of Object.keys(diff.per_field || {})) {
+      const v = diff.per_field[field];
+      const row = document.createElement("div");
+      row.className = "grid grid-cols-[1.2fr_auto_auto_auto_auto] gap-3 items-center";
+      row.innerHTML = `
+        <span class="font-mono text-on-surface-variant">${field}</span>
+        <span class="font-mono">${fmtPct(v.a)}</span>
+        <span class="font-mono text-on-surface-variant">→</span>
+        <span class="font-mono">${fmtPct(v.b)}</span>
+        <span class="font-mono font-bold ${deltaClass(v.delta)}">${fmtPp(v.delta)} ${arrow(v.delta)}</span>
+      `;
+      diffPerField.appendChild(row);
+    }
+
+    diffPerSupplier.innerHTML = "";
+    const sups = diff.per_supplier || {};
+    const supKeys = Object.keys(sups).sort((x, y) => (sups[x].delta || 0) - (sups[y].delta || 0));
+    if (supKeys.length === 0) {
+      diffPerSupplier.innerHTML = `<p class="text-on-surface-variant italic">Aucun fournisseur commun entre les deux runs.</p>`;
+    } else {
+      for (const sup of supKeys) {
+        const v = sups[sup];
+        const row = document.createElement("div");
+        row.className = "grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3 items-center";
+        row.innerHTML = `
+          <span class="font-mono text-on-surface-variant">${sup}</span>
+          <span class="font-mono">${fmtPct(v.a)}</span>
+          <span class="font-mono text-on-surface-variant">→</span>
+          <span class="font-mono">${fmtPct(v.b)}</span>
+          <span class="font-mono font-bold ${deltaClass(v.delta)}">${fmtPp(v.delta)} ${arrow(v.delta)}</span>
+          <span class="text-on-surface-variant/70">(${v.n_a || 0} → ${v.n_b || 0} PDFs)</span>
+        `;
+        diffPerSupplier.appendChild(row);
+      }
+    }
+
+    const LIMIT = 20;
+    renderVerdictChanges(regressionsList, regressionsCount, diff.regressions || [], LIMIT, "→");
+    renderVerdictChanges(improvementsList, improvementsCount, diff.improvements || [], LIMIT, "→ match");
+
+    diffSection.classList.remove("hidden");
+  }
+
+  function renderVerdictChanges(listEl, countEl, items, limit, arrowText) {
+    countEl.textContent = `(${items.length})`;
+    listEl.innerHTML = "";
+    if (items.length === 0) {
+      listEl.innerHTML = `<p class="text-on-surface-variant italic">Aucun</p>`;
+      return;
+    }
+    const shown = items.slice(0, limit);
+    for (const r of shown) {
+      const div = document.createElement("div");
+      div.className = "text-on-surface-variant";
+      // Keep filename truncated visually but preserve full on hover
+      div.innerHTML = `
+        <span class="inline-block max-w-[260px] truncate align-bottom" title="${r.filename}">${r.filename}</span>
+        <span class="mx-2 text-on-surface-variant/60">·</span>
+        <span class="text-on-surface">${r.field}</span>
+        <span class="mx-2 text-on-surface-variant/60">${r.verdict_a} → ${r.verdict_b}</span>
+      `;
+      listEl.appendChild(div);
+    }
+    if (items.length > limit) {
+      const more = document.createElement("div");
+      more.className = "text-on-surface-variant/70 italic mt-1";
+      more.textContent = `… et ${items.length - limit} de plus`;
+      listEl.appendChild(more);
+    }
+  }
+
+  btnDiff.addEventListener("click", submitDiff);
+  btnCloseDiff.addEventListener("click", () => diffSection.classList.add("hidden"));
 
   // Single submit handler: run the eval, then refresh history so the new run
   // appears at the top of the table.
