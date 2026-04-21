@@ -31,6 +31,12 @@
   const btnDownload = $("btn-download");
   const toast = $("toast");
 
+  // SSE progress (chantier 5.4)
+  const progressBar = $("progress-bar");
+  const progressPercent = $("progress-percent");
+  const progressSummary = $("progress-summary");
+  const progressLast = $("progress-last");
+
   // History (chantier 5.2)
   const historySection = $("history-section");
   const historyCount = $("history-count");
@@ -75,6 +81,24 @@
     return "█".repeat(filled) + "░".repeat(width - filled);
   }
 
+  function resetProgress() {
+    progressBar.style.width = "0%";
+    progressPercent.textContent = "0%";
+    progressSummary.textContent = "Initialisation…";
+    progressLast.textContent = "";
+  }
+
+  function updateProgress(index, total, filename, installateur) {
+    const pct = total > 0 ? Math.round((index / total) * 100) : 0;
+    progressBar.style.width = pct + "%";
+    progressPercent.textContent = pct + "%";
+    progressSummary.textContent = `${index} / ${total} PDFs traités`;
+    if (filename) {
+      const short = filename.length > 60 ? "…" + filename.slice(-59) : filename;
+      progressLast.textContent = `${short}   (${installateur || "?"})`;
+    }
+  }
+
   async function submitEval(event) {
     event.preventDefault();
     if (state.isRunning) return;
@@ -90,20 +114,72 @@
 
     state.isRunning = true;
     btnRun.disabled = true;
+    resetProgress();
     loading.classList.remove("hidden");
     results.classList.add("hidden");
 
+    let finalPayload = null;
+
     try {
-      const res = await fetch(API_EVAL, { method: "POST", body: fd });
-      let data = null;
-      try { data = await res.json(); } catch (_) { /* non-json */ }
+      const res = await fetch("/api/admin/eval/stream", { method: "POST", body: fd });
       if (!res.ok) {
-        const detail = (data && (data.detail || data.error)) || `HTTP ${res.status}`;
+        // Fail-fast errors (bad ZIP extension, validation) come back as plain JSON.
+        let detail = `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          detail = body.detail || body.error || detail;
+        } catch (_) { /* non-json */ }
         throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
       }
-      state.currentRun = data;
-      renderResults(data);
-      showToast(`Run '${data.run_id}' terminé.`, "ok");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+      let streamError = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let sep;
+        while ((sep = buffer.indexOf("\n\n")) !== -1) {
+          const chunk = buffer.slice(0, sep).trim();
+          buffer = buffer.slice(sep + 2);
+          if (!chunk.startsWith("data: ")) continue;
+          let payload;
+          try {
+            payload = JSON.parse(chunk.slice(6));
+          } catch (_) {
+            continue;
+          }
+          if (payload.type === "init") {
+            updateProgress(0, payload.total, null, null);
+          } else if (payload.type === "progress") {
+            updateProgress(payload.index, payload.total, payload.filename, payload.installateur);
+          } else if (payload.type === "done") {
+            finalPayload = {
+              run_id: payload.run_id,
+              result: payload.result,
+              download_url: payload.download_url,
+            };
+          } else if (payload.type === "error") {
+            streamError = payload.error || "unknown server error";
+          }
+        }
+      }
+
+      if (streamError) {
+        throw new Error(streamError);
+      }
+      if (!finalPayload || !finalPayload.result) {
+        throw new Error("le serveur n'a pas envoyé d'événement 'done'");
+      }
+      state.currentRun = finalPayload;
+      renderResults(finalPayload);
+      const label = finalPayload.run_id ? `Run '${finalPayload.run_id}' terminé.`
+                                        : "Évaluation terminée (aucun PDF apparié, rien sauvegardé).";
+      showToast(label, "ok");
     } catch (e) {
       showToast(`Erreur éval : ${e.message}`, "error");
     } finally {
