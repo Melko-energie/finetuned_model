@@ -10,6 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core.eval.excel_report import dump_excel
 from core.eval.report import dump_json, render_terminal
 from core.eval.runner import run_eval
 
@@ -24,6 +25,8 @@ def main():
                         help="Ground-truth Excel (sheet 'Extractions' or 'TOUTES_FACTURES').")
     parser.add_argument("--output", type=Path, default=None,
                         help="Optional: dump full JSON results to this path.")
+    parser.add_argument("--excel", type=Path, default=None,
+                        help="Optional: dump a colored XLSX report (Summary + Details sheets).")
     args = parser.parse_args()
 
     if not args.pdfs.is_dir():
@@ -39,6 +42,10 @@ def main():
     if args.output:
         dump_json(result, args.output)
         print(f"  JSON dump  : {args.output}")
+
+    if args.excel:
+        dump_excel(result, args.excel)
+        print(f"  Excel      : {args.excel}")
 
 
 if __name__ == "__main__":
