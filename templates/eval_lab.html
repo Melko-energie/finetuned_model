@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+  <!-- Lab banner -->
+  <div class="rounded-lg border border-tertiary-fixed-dim/40 bg-tertiary-fixed/50 px-4 py-3 flex items-start gap-3">
+    <span class="material-symbols-outlined text-tertiary">science</span>
+    <div class="flex-1 text-sm text-on-surface">
+      <span class="font-bold">Éval Lab — banc d'évaluation.</span>
+      Mesure objective de la qualité d'extraction sur un lot de factures annotées.
+      L'historique et la comparaison de runs arrivent en 5.2 / 5.3.
+    </div>
+  </div>
+
+  <!-- Section header -->
+  <div>
+    <span class="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Administration (lab)</span>
+    <h2 class="font-headline text-3xl font-extrabold text-on-surface">Banc d'évaluation</h2>
+    <p class="text-xs text-on-surface-variant mt-1">
+      Fournis un ZIP de factures + un Excel de vérité terrain. L'app extrait chaque facture,
+      compare aux valeurs attendues, et renvoie les métriques par champ et par fournisseur.
+    </p>
+  </div>
+
+  <!-- Upload form -->
+  <form id="form-eval" class="bg-white rounded-xl p-6 border border-outline-variant/50 space-y-5">
+    <div>
+      <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">
+        ZIP de factures (PDFs)
+      </label>
+      <input id="input-pdfs-zip" type="file" accept=".zip" required
+             class="w-full text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-primary file:text-white file:font-medium file:cursor-pointer hover:file:bg-primary-container"/>
+      <p class="text-[10px] text-on-surface-variant mt-1">
+        Le ZIP peut contenir les PDFs en vrac ou dans des sous-dossiers (scan récursif côté serveur).
+      </p>
+    </div>
+
+    <div>
+      <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">
+        Ground truth (fichier Excel)
+      </label>
+      <input id="input-truth-xlsx" type="file" accept=".xlsx" required
+             class="w-full text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-primary file:text-white file:font-medium file:cursor-pointer hover:file:bg-primary-container"/>
+      <p class="text-[10px] text-on-surface-variant mt-1">
+        Format = export de <a href="/batch" class="text-primary underline">Traitement par lot</a>, colonne <code>Nom du PDF</code> pour l'appariement.
+      </p>
+    </div>
+
+    <div class="flex justify-end pt-2 border-t border-outline-variant/50">
+      <button type="submit" id="btn-run" class="bg-primary text-white px-5 py-2.5 rounded-md font-medium text-sm flex items-center gap-2 shadow-sm hover:bg-primary-container transition-colors disabled:opacity-40 disabled:cursor-wait">
+        <span class="material-symbols-outlined text-sm">play_arrow</span>
+        Lancer l'évaluation
+      </button>
+    </div>
+  </form>
+
+  <!-- Loading state -->
+  <div id="loading" class="hidden flex items-center gap-3 p-4 bg-tertiary-fixed/40 rounded-xl">
+    <span class="material-symbols-outlined text-tertiary animate-spin">progress_activity</span>
+    <div class="text-sm text-on-surface">
+      <div class="font-medium">Évaluation en cours…</div>
+      <div class="text-xs text-on-surface-variant">
+        OCR + extraction Gemma2 sur chaque PDF. Compte ~5-10 s par facture, soit plusieurs minutes sur un lot de 50-100 PDFs. Cette page restera ouverte.
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <section id="results" class="hidden bg-white rounded-xl p-6 border border-outline-variant/50 space-y-6">
+    <!-- Meta -->
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">verified</span>
+          <span class="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Run sauvegardé</span>
+        </div>
+        <h3 id="run-id" class="font-headline text-xl font-bold text-on-surface mt-1"></h3>
+        <p id="run-meta" class="text-xs text-on-surface-variant mt-1"></p>
+      </div>
+      <a id="btn-download" href="#" download class="bg-secondary-container text-on-secondary-fixed-variant px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 shadow-sm hover:bg-secondary-fixed transition-colors">
+        <span class="material-symbols-outlined text-sm">download</span>
+        Télécharger le rapport Excel
+      </a>
+    </div>
+
+    <!-- Global metrics -->
+    <div class="grid grid-cols-2 gap-4">
+      <div class="bg-surface-container-low rounded-lg p-4">
+        <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Accuracy globale (micro)</div>
+        <div id="global-micro" class="font-headline text-3xl font-extrabold mt-1"></div>
+        <div id="global-micro-detail" class="text-xs text-on-surface-variant mt-1"></div>
+      </div>
+      <div class="bg-surface-container-low rounded-lg p-4">
+        <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Accuracy globale (macro)</div>
+        <div id="global-macro" class="font-headline text-3xl font-extrabold mt-1"></div>
+        <div class="text-xs text-on-surface-variant mt-1">moyenne des accuracies par champ</div>
+      </div>
+    </div>
+
+    <!-- Per-field -->
+    <div>
+      <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Par champ</div>
+      <div id="per-field-table" class="space-y-1 text-xs"></div>
+    </div>
+
+    <!-- Per-supplier -->
+    <div>
+      <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Par fournisseur (pires en premier)</div>
+      <div id="per-supplier-list" class="space-y-1 text-xs"></div>
+    </div>
+  </section>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="hidden fixed bottom-6 right-6 px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium z-50"></div>
+
+<script src="/static/js/eval_lab.js"></script>
+{% endblock %}

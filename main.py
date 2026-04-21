@@ -52,3 +52,8 @@ async def page_admin(request: Request):
 @app.get("/admin-lab")
 async def page_admin_lab(request: Request):
     return templates.TemplateResponse(request=request, name="admin_lab.html", context={"active": "admin-lab"})
+
+
+@app.get("/eval-lab")
+async def page_eval_lab(request: Request):
+    return templates.TemplateResponse(request=request, name="eval_lab.html", context={"active": "eval-lab"})
