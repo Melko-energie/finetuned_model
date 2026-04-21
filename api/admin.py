@@ -6,15 +6,20 @@ change is visible to the extraction pipeline immediately.
 """
 
 import os
+import re
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from core.eval.dataset import load_ground_truth
+from core.ocr import run_doctr_ocr
+from core.prompt_gen import PromptGenerationError, generate_prompt_from_samples
 from core.prompts import PROMPTS_DIR, PromptConfigError, reload as reload_prompts
 
 router = APIRouter(prefix="/api/admin")
@@ -225,3 +230,106 @@ async def delete_prompt(key: str):
     _reload_or_500()
 
     return {"status": "deleted", "key": key}
+
+
+# ─────────────────────────────────────────
+# Prompt generation (chantier 4.2)
+# ─────────────────────────────────────────
+
+_KEY_RE = re.compile(KEY_PATTERN)
+
+
+@router.post("/prompts/generate", dependencies=[Depends(_require_localhost)])
+async def generate_prompt(
+    key: str = Form(...),
+    pdfs: list[UploadFile] = File(...),
+    truth_xlsx: UploadFile = File(...),
+):
+    """Generate a draft prompt from 2-5 sample PDFs + a ground-truth XLSX.
+
+    The draft is returned but NOT persisted — the human operator reviews
+    and saves it through /admin-lab using the existing POST /api/admin/prompts
+    endpoint. This keeps review-before-save intact.
+    """
+    # ── cheap validations first (no OCR yet) ──
+    if not key or len(key) > 50 or not _KEY_RE.match(key):
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid key '{key}': must match {KEY_PATTERN} and be <= 50 chars",
+        )
+    if key in RESERVED_KEYS:
+        raise HTTPException(status_code=400, detail=f"'{key}' is a reserved key")
+
+    if len(pdfs) < 2:
+        raise HTTPException(status_code=400, detail="at least 2 sample PDFs required")
+    if len(pdfs) > 5:
+        raise HTTPException(status_code=400, detail="max 5 sample PDFs")
+
+    if not truth_xlsx.filename or not truth_xlsx.filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="truth_xlsx must be a .xlsx file")
+
+    # ── load ground truth from the uploaded Excel ──
+    truth_bytes = await truth_xlsx.read()
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        tmp.write(truth_bytes)
+        tmp_path = Path(tmp.name)
+    try:
+        try:
+            truth_rows = load_ground_truth(tmp_path)
+        except (FileNotFoundError, ValueError) as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except PermissionError:
+            # Windows may still hold a handle briefly; the temp dir is
+            # cleaned by the OS anyway, so we don't fail the request on this.
+            pass
+
+    truth_by_stem = {Path(r["filename"]).stem.lower(): r["fields"] for r in truth_rows}
+
+    # ── match PDFs against truth BEFORE running any OCR ──
+    samples_plan = []
+    for uf in pdfs:
+        fname = uf.filename or ""
+        if not fname.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail=f"'{fname}' is not a .pdf file")
+        stem = Path(fname).stem.lower()
+        expected = truth_by_stem.get(stem)
+        if expected is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{fname}' has no matching row in truth_xlsx "
+                       f"(available: {sorted(truth_by_stem.keys())[:5]}…)",
+            )
+        samples_plan.append((uf, expected))
+
+    # ── run live OCR and build samples ──
+    samples = []
+    for uf, expected in samples_plan:
+        pdf_bytes = await uf.read()
+        try:
+            ocr_text = run_doctr_ocr(pdf_bytes, ".pdf")
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"OCR failed on '{uf.filename}': {e}",
+            )
+        if not ocr_text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail=f"OCR produced empty text for '{uf.filename}'",
+            )
+        samples.append({"ocr_text": ocr_text, "expected": expected})
+
+    # ── call the generator ──
+    try:
+        draft = generate_prompt_from_samples(samples)
+    except PromptGenerationError as e:
+        raise HTTPException(status_code=500, detail=f"prompt generation failed: {e}")
+
+    return {
+        "key": key,
+        "detecter": draft["detecter"],
+        "prompt": draft["prompt"],
+    }

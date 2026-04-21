@@ -46,12 +46,13 @@ def load_ground_truth(xlsx_path: Path) -> list[dict]:
     if not xlsx_path.is_file():
         raise FileNotFoundError(f"Ground truth file not found: {xlsx_path}")
 
-    xl = pd.ExcelFile(xlsx_path)
-    sheet = next((s for s in _SHEET_CANDIDATES if s in xl.sheet_names), None)
+    with pd.ExcelFile(xlsx_path) as xl:
+        sheet = next((s for s in _SHEET_CANDIDATES if s in xl.sheet_names), None)
+        sheet_names = list(xl.sheet_names)
     if sheet is None:
         raise ValueError(
             f"No expected sheet found in {xlsx_path.name}. "
-            f"Looked for: {_SHEET_CANDIDATES}. Got: {xl.sheet_names}"
+            f"Looked for: {_SHEET_CANDIDATES}. Got: {sheet_names}"
         )
 
     # The batch export uses startrow=2, so the real header is on Excel row 3
