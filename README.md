@@ -1,145 +1,342 @@
-# Extraction de Factures BTP — Gemma2:9b + OCR DocTR
+# Extraction de Factures BTP
 
-Extraction automatique de champs depuis des factures BTP francaises via **Gemma2:9b** (Ollama) et **OCR DocTR**.
+> Extraction automatisée des champs de factures BTP francaises via OCR DocTR + LLM Gemma2:9b servi par Ollama, avec interface d'administration des prompts et banc d'évaluation intégré.
 
-Interface Streamlit avec 2 modes :
-- **Gemma2 Texte** : prompt generique sur le texte OCR
-- **Gemma2 Smart** : detection automatique du fournisseur + prompt specialise
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688)
+![Ollama](https://img.shields.io/badge/LLM-gemma2%3A9b-orange)
+![OCR](https://img.shields.io/badge/OCR-DocTR-7B61FF)
 
----
+## Description
+
+Application web qui extrait automatiquement 9 champs (numéro, date, HT, TVA, TTC, installateur, commune, code postal, adresse) depuis des PDF de factures BTP, sans appel à un service externe : tout tourne en local (OCR via DocTR, LLM via Ollama).
+
+Conçue pour Melko Energie (gestion administrative de chantiers de rénovation énergétique), elle gère **30 profils de fournisseurs** avec des prompts spécialisés par émetteur — incluant les auto-facturations SIP AMIENS (sous-traitants NVINS).
+
+**Ce que le projet apporte de spécifique** :
+
+- **Les prompts vivent en dehors du code** dans `config/prompts/*.yaml` : ils sont éditables par le métier via une interface web `/admin` sans redéploiement.
+- **Un banc d'évaluation intégré** (CLI + API HTTP + UI `/eval-lab`) mesure objectivement la qualité d'extraction par champ et par fournisseur, compare deux runs pour détecter régressions et améliorations.
+- **Une UI expérimentale `/admin-lab`** permet de générer un nouveau prompt automatiquement à partir de 2-5 factures échantillons + un Excel de valeurs attendues (Gemma2 produit un brouillon, le métier relit et sauvegarde).
+
+Public cible : équipes administratives qui manipulent des lots de factures BTP en français, et leurs référents techniques.
+
+## Aperçu
+
+L'interface FastAPI expose 7 pages :
+
+| Page         | Usage                                                                    |
+| ------------ | ------------------------------------------------------------------------ |
+| `/texte`     | Prompt générique sur le texte OCR pré-calculé                            |
+| `/smart`     | Détection automatique du fournisseur + prompt spécialisé                 |
+| `/nouvelle`  | Upload d'une nouvelle facture (OCR live via DocTR)                       |
+| `/batch`     | Extraction par lot d'un ZIP avec progression SSE et export Excel         |
+| `/admin`     | Édition des prompts, version **stable** (CRUD + hot-reload)              |
+| `/admin-lab` | Version **expérimentale** : `/admin` + génération assistée par LLM       |
+| `/eval-lab`  | Banc d'évaluation web : upload → metrics en live → historique → diff A/B |
 
 ## Champs extraits
 
-| Champ | Description |
-|---|---|
-| NUMERO_FACTURE | Numero complet de la facture |
-| DATE_FACTURE | Date d'emission (JJ/MM/AAAA) |
-| MONTANT_HT | Montant hors taxes |
-| TAUX_TVA | Taux de TVA (5.5%, 10%, 20%) |
-| MONTANT_TTC | Montant TTC / Net a payer |
-| NOM_INSTALLATEUR | Entreprise emettrice |
-| COMMUNE_TRAVAUX | Ville du chantier |
-| CODE_POSTAL | Code postal du chantier |
-| ADRESSE_TRAVAUX | Adresse complete du chantier |
+| Champ              | Description                          |
+| ------------------ | ------------------------------------ |
+| `NUMERO_FACTURE`   | Numéro complet de la facture         |
+| `DATE_FACTURE`     | Date d'émission (JJ/MM/AAAA)         |
+| `MONTANT_HT`       | Montant hors taxes                   |
+| `TAUX_TVA`         | Taux TVA (5.5 %, 10 %, 20 %)         |
+| `MONTANT_TTC`      | Montant TTC / Net à payer            |
+| `NOM_INSTALLATEUR` | Entreprise émettrice                 |
+| `COMMUNE_TRAVAUX`  | Ville du chantier                    |
+| `CODE_POSTAL`      | Code postal du chantier              |
+| `ADRESSE_TRAVAUX`  | Adresse complète du chantier         |
 
----
+## Prerequisites
+
+- **Python 3.11+**
+- **Ollama** installé et lancé ([https://ollama.com](https://ollama.com))
+- **GPU recommandé** : NVIDIA avec >= 12 GB VRAM (testé sur RTX 5080 Laptop, 15.9 GB)
+- **OS** : Windows 11 (développé et testé). Les commandes shell ci-dessous fonctionnent sous Git Bash, WSL, macOS et Linux.
+
+## Installation
+
+```bash
+# 1. Cloner le repo
+git clone https://github.com/Melko-energie/finetuned_model.git
+cd finetuned_model
+
+# 2. Créer un environnement virtuel
+python -m venv venv
+# Windows (Git Bash) :
+source venv/Scripts/activate
+# macOS / Linux :
+# source venv/bin/activate
+
+# 3. Installer les dépendances Python
+pip install -r requirements.txt
+
+# 4. Télécharger le modèle Gemma2 dans Ollama
+ollama pull gemma2:9b
+```
+
+Raccourci avec le `Makefile` (cf. section [Make](#make)) :
+
+```bash
+make install
+```
+
+## Configuration
+
+Aucune variable d'environnement requise. Tous les paramètres techniques sont centralisés dans **`core/config.py`** :
+
+| Constante         | Valeur par défaut          | Rôle                                         |
+| ----------------- | -------------------------- | -------------------------------------------- |
+| `MODEL_NAME`      | `"gemma2:9b"`              | Modèle Ollama utilisé pour l'extraction      |
+| `OLLAMA_OPTIONS`  | `{temperature: 0, seed: 42}` | Déterminisme : indispensable à chaque appel  |
+| `OCR_DIR`         | `data/ocr_texts/`          | JSON DocTR pré-calculés                      |
+| `PDF_DIR`         | `data/raw_pdfs/`           | PDF source organisés par fournisseur         |
+| `ALL_FIELD_KEYS`  | 9 clés                     | Champs à extraire                            |
+
+**Les prompts d'extraction** sont dans `config/prompts/*.yaml` (un fichier par fournisseur). Ils sont éditables :
+
+- Manuellement à la main, puis rechargés via `POST /api/admin/reload-prompts`.
+- Via l'interface web `/admin` qui fait l'édition + le reload automatiquement.
+
+## Usage
+
+### Interface web
+
+```bash
+uvicorn main:app --reload
+```
+
+Ouvrir [http://127.0.0.1:8000](http://127.0.0.1:8000). Si le port est bloqué (Windows réserve parfois 8000) :
+
+```bash
+uvicorn main:app --reload --port 8001
+```
+
+### Édition des prompts par le métier
+
+Ouvrir [/admin](http://127.0.0.1:8001/admin) (version stable) :
+
+- Liste des 32 prompts à gauche (30 fournisseurs + `texte` + `default`), barre de recherche, groupes `Fournisseurs` / `Système`.
+- Éditeur à droite : clé, mots-clés de détection, prompt multi-lignes.
+- `+ Nouveau` pour créer un fournisseur.
+- `Sauvegarder` recharge automatiquement l'application, la prochaine extraction utilise la nouvelle version.
+
+### Génération assistée d'un nouveau prompt
+
+Ouvrir [/admin-lab](http://127.0.0.1:8001/admin-lab) (version expérimentale) :
+
+- Bouton `Générer depuis des factures`.
+- Modal : saisir la clé du fournisseur + déposer 2 à 5 PDFs échantillons + un Excel ground truth (valeurs attendues).
+- Le serveur lance l'OCR live sur chaque PDF puis demande à Gemma2 de produire un brouillon de prompt + une liste de mots-clés de détection, d'après les échantillons et les valeurs attendues.
+- Le brouillon pré-remplit l'éditeur en mode `brouillon`, accompagné d'un panneau **Auto-test** qui extrait les mêmes samples avec le nouveau prompt et affiche l'accuracy par champ. L'utilisateur relit, corrige les champs problématiques, puis `Sauvegarder`.
+
+### Évaluation sur un lot annoté (UI)
+
+Ouvrir [/eval-lab](http://127.0.0.1:8001/eval-lab) :
+
+- Upload d'un ZIP de PDFs + d'un Excel de vérité terrain (même format que l'export `/batch`).
+- Barre de progression live via SSE (chantier 5.4) : `N/total PDFs traités`, % et nom du dernier PDF.
+- Résultats : tuiles micro/macro, tableau par champ, liste par fournisseur (pires en premier), bouton de téléchargement du rapport XLSX coloré.
+- Section **Historique** : liste des runs passés, clic `Voir` recharge sans réexécuter.
+- Sélectionner 2 runs + `Comparer` → section diff : deltas global / par champ / par fournisseur + listes de régressions et améliorations par-PDF.
+
+⚠️ `/admin`, `/admin-lab` et `/eval-lab` sont **protégés par une restriction localhost-only** tant que le chantier d'authentification n'est pas livré. **Ne pas exposer sur le réseau** (cette protection n'est PAS suffisante pour la production).
+
+### Pipeline OCR pour de nouvelles factures
+
+```bash
+# Déposer les PDF dans data/raw_pdfs/<fournisseur>/
+python scripts/pdf_to_images.py   # PDF -> PNG (convention _page0, _page1…)
+python scripts/run_ocr.py         # PNG -> JSON DocTR dans data/ocr_texts/
+```
+
+### Banc d'évaluation
+
+Mesure objective de la qualité d'extraction sur un lot de factures, à partir d'un Excel de vérité terrain (ground truth).
+
+**Format du ground truth** : même structure que l'export de `/batch` (feuille `Extractions` ou `TOUTES_FACTURES`). Flux pratique :
+
+1. Lancer `/batch` sur un lot de factures connues → exporter en Excel.
+2. Ouvrir l'Excel et corriger manuellement les cellules où l'extraction s'est trompée.
+3. Sauver sous `ground_truth.xlsx`.
+
+```bash
+# Lancer une évaluation (sauvegardée automatiquement dans data/eval_runs/<timestamp>/)
+python scripts/run_eval.py run --pdfs data/echantillon --truth ground_truth.xlsx --excel rapport.xlsx
+
+# Lister les runs passés
+python scripts/run_eval.py list
+
+# Comparer deux runs (typiquement avant/après édition d'un prompt)
+python scripts/run_eval.py diff previous latest
+```
+
+Sortie terminal : accuracy par champ + globale, breakdown par fournisseur (pires en premier), barres ASCII. L'export Excel colore les cellules par verdict (match / mismatch / missing / unexpected).
+
+### API REST
+
+```bash
+# Endpoints publics
+curl http://127.0.0.1:8001/api/fournisseurs
+curl -F "file=@facture.pdf" http://127.0.0.1:8001/api/extract-smart
+curl -F "file=@lot.zip" http://127.0.0.1:8001/api/batch
+
+# Endpoints admin (localhost-only)
+curl http://127.0.0.1:8001/api/admin/prompts
+curl -X POST http://127.0.0.1:8001/api/admin/reload-prompts
+
+# Génération assistée d'un nouveau prompt
+curl -F "key=acme_sarl" \
+     -F "pdfs=@sample_a.pdf" -F "pdfs=@sample_b.pdf" \
+     -F "truth_xlsx=@truth.xlsx" \
+     http://127.0.0.1:8001/api/admin/prompts/generate
+
+# Lancer un eval via HTTP (JSON sync)
+curl -F "pdfs_zip=@lot.zip" -F "truth_xlsx=@truth.xlsx" \
+     http://127.0.0.1:8001/api/admin/eval
+
+# Lancer un eval en streaming SSE (recommandé pour les gros lots)
+curl -N -F "pdfs_zip=@lot.zip" -F "truth_xlsx=@truth.xlsx" \
+     http://127.0.0.1:8001/api/admin/eval/stream
+
+# Historique + diff
+curl http://127.0.0.1:8001/api/admin/eval/runs
+curl http://127.0.0.1:8001/api/admin/eval/runs/<run_id>
+curl http://127.0.0.1:8001/api/admin/eval/runs/<id_a>/diff/<id_b>
+```
+
+## Tests
+
+Pas encore de suite de tests automatisés (chantier futur). La vérification de régression se fait via :
+
+- `python scripts/extract_cli.py` qui rejoue 3 factures de référence.
+- `python scripts/run_eval.py run --pdfs … --truth …` qui mesure la qualité sur un lot annoté + `diff previous latest` pour confirmer qu'un changement de prompt n'a pas régressé.
 
 ## Structure du projet
 
 ```
 finetuned_model/
-├── app.py                      # Interface Streamlit (2 onglets)
-├── context.md                  # Documentation projet
-├── requirements.txt
-├── assets/logo.png
+├── main.py                      # Entrée FastAPI (routes des pages + montage des routers)
+├── api/
+│   ├── routes.py                # Endpoints publics /api/* (extraction, batch, exports)
+│   ├── admin.py                 # Endpoints admin /api/admin/* (CRUD prompts, reload, generate)
+│   └── admin_eval.py            # Endpoints admin /api/admin/eval/* (eval sync + SSE stream)
+├── core/                        # Logique métier pure (zéro dépendance web)
+│   ├── config.py                # Paths, MODEL_NAME, OLLAMA_OPTIONS, FIELDS
+│   ├── prompts.py               # Loader YAML + reload() hot-swap
+│   ├── detection.py             # detect_installateur, detect_avoir
+│   ├── ocr.py                   # DocTR singleton + JSON loader + live pipeline
+│   ├── postprocess.py           # clean_json, cohérence montants, blacklist SIP HQ
+│   ├── extraction.py            # 3 entry points + extraire_champs_with_prompt (inline)
+│   ├── batch.py                 # iter_batch_zip, process_batch_zip
+│   ├── excel.py                 # Exports Excel (single + multi-sheets)
+│   ├── prompt_gen.py            # Génération d'un brouillon de prompt via LLM (chantier 4)
+│   └── eval/                    # Banc d'évaluation
+│       ├── normalize.py         # Normalisation par champ (dates, nombres, accents)
+│       ├── dataset.py           # Load ground truth Excel + index PDFs
+│       ├── compare.py           # Verdicts match / mismatch / missing / unexpected
+│       ├── metrics.py           # Agrégation globale + par fournisseur
+│       ├── report.py            # Rendu terminal + dump JSON
+│       ├── excel_report.py      # Rapport XLSX coloré (Summary / Details / Per-Supplier)
+│       ├── history.py           # Sauvegarde et chargement des runs passés
+│       ├── diff.py              # Diff structuré entre deux runs
+│       └── runner.py            # iter_run_eval (SSE) + run_eval (wrapper sync)
+├── config/
+│   └── prompts/*.yaml           # 30 fournisseurs + texte.yaml + default.yaml
+├── templates/                   # Jinja2 (base, texte, smart, nouvelle, batch,
+│                                #         admin, admin_lab, eval_lab)
+├── static/js/                   # JS front (app.js, admin.js, admin_lab.js, eval_lab.js)
 ├── scripts/
-│   ├── 00_pdf_to_images.py     # PDF → PNG (convention _page0)
-│   ├── 01_ocr_extraction.py    # DocTR OCR → JSON
-│   └── 12_gemma2_smart.py      # Extraction smart par fournisseur
-└── data/
-    ├── raw_pdfs/               # PDFs source (17 fournisseurs)
-    ├── page_images/            # PNG generes par script 00
-    └── ocr_texts/              # JSON OCR DocTR par fournisseur
+│   ├── pdf_to_images.py         # PDF -> PNG
+│   ├── run_ocr.py               # PNG -> JSON DocTR
+│   ├── extract_cli.py           # Smoke test sur 3 PDFs
+│   └── run_eval.py              # CLI eval (run / list / diff)
+├── assets/logo.png
+├── data/                        # gitignore (PDF, images, OCR, eval runs, listes installateurs)
+│   ├── raw_pdfs/<fournisseur>/
+│   ├── page_images/
+│   ├── ocr_texts/
+│   └── eval_runs/<id>/result.json (+ report.xlsx)
+├── docs/superpowers/specs/      # Specs de design par chantier
+├── Makefile
+├── requirements.txt
+└── README.md
 ```
 
----
+**Règle d'architecture** : `api/` et `scripts/` consomment `core/`. `core/` n'a aucune dépendance à FastAPI ni à l'écosystème web. Les endpoints admin (CRUD prompts + eval) sont isolés dans leurs propres fichiers pour garder `routes.py` focalisé sur l'extraction publique.
 
-## Demarrage rapide
+## Fournisseurs supportés (30 profils)
 
-### 1. Installation
+### Fournisseurs principaux (22)
+
+A2M, ARCANA, CAILLOCE, CLOROFIL, DILA, ECO2E, ESTEVE, EXIM, GAZ DE BORDEAUX, GAZETTE, GIGABAT, HESTIA, JLA, KELVIN, LOGISTA, OREA, OTIS, POULAIN, RCPI, SOCOTEC, TERNEL, TOTAL ENERGIES.
+
+### Sous-installateurs NVINS (8 auto-facturations SIP AMIENS)
+
+KLISZ, PROXISERVE, LOGISTA, L'UNION DES PEINTRES, SAS APPLI, TECHSOL, NUMERISS, SIP AMIENS (fallback).
+
+Plus un prompt `DEFAULT` déclenché pour tout fournisseur non reconnu.
+
+## Make
+
+Cibles disponibles (nécessite [`make`](https://www.gnu.org/software/make/) installé) :
 
 ```bash
-git clone https://github.com/Melko-energie/finetuned_model.git
-cd finetuned_model
-pip install -r requirements.txt
+make install   # Crée le venv et installe les dépendances
+make run       # Lance FastAPI sur le port 8001
+make ocr       # Pipeline OCR complet : pdf_to_images puis run_ocr
+make cli       # Smoke test extract_cli sur 3 PDFs
+make clean     # Supprime les caches __pycache__
+make help      # Liste les cibles
 ```
-
-Prerequis : **Ollama** avec le modele `gemma2:9b` :
-```bash
-ollama pull gemma2:9b
-```
-
-### 2. Pipeline OCR (pour nouvelles factures)
-
-```bash
-# Mettre les PDFs dans data/raw_pdfs/{fournisseur}/
-
-# 1. PDF → Images PNG
-python scripts/00_pdf_to_images.py
-
-# 2. Images → OCR JSON
-python scripts/01_ocr_extraction.py
-```
-
-### 3. Interface Streamlit
-
-```bash
-streamlit run app.py
-```
-
-### 4. Extraction en ligne de commande
-
-```bash
-python scripts/12_gemma2_smart.py
-```
-
----
-
-## Fournisseurs supportes (25 profils)
-
-### Fournisseurs principaux (17)
-
-| Fournisseur | TVA | Particularite |
-|---|---|---|
-| A2M | 5.5% | Electricien RGE, renovation energetique |
-| ARCANA | 20% | Architecture, note d'honoraires |
-| CAILLOCE | 20% | Avocat, facturation horaire |
-| DILA | 20% | Titre de perception (gouvernement) |
-| ECO2E | 20% | Bureau d'etudes fluides |
-| ESTEVE | 20% | Electricite |
-| EXIM | 20% | Diagnostics amiante (ATHOS) |
-| GAZETTE | 20% | Annonces legales |
-| GIGABAT | 20% | Coordination SPS |
-| HESTIA | 10% | Bureau d'etudes habitat |
-| KELVIN | 20% | Etudes thermiques |
-| OREA | 20% | Maitrise d'oeuvre |
-| POULAIN | 20% | Bureau d'etudes thermiques |
-| RCPI | 20% | Maitrise d'oeuvre batiment |
-| SOCOTEC | 20% | Controle technique |
-| TERNEL | 20% + 5.5% | Couverture/charpente, TVA mixte |
-
-### Sous-installateurs NVINS (8 auto-facturations SIP)
-
-| Installateur | Prefixe | Metier |
-|---|---|---|
-| KLISZ | 8DE- | Peinture/finitions |
-| PROXISERVE | 8PR- | Plomberie/chauffage (TVA 5.5%) |
-| LOGISTA | 8LO- | Plomberie/chauffage |
-| L'UNION DES PEINTRES | 8UN- | Peinture (SCOP) |
-| SAS APPLI | 8AP- | Peinture |
-| TECHSOL | 8TH- | Revetements de sols |
-| NUMERISS | 8NU- | Electricite |
-| SIP AMIENS | — | Fallback generique |
-
----
-
-## Environnement technique
-
-- **OS** : Windows 11
-- **Python** : 3.11+
-- **OCR** : DocTR
-- **LLM** : Gemma2:9b via Ollama
-- **Interface** : Streamlit
-- **GPU** : NVIDIA RTX 5080 Laptop (15.9 GB VRAM)
-
----
 
 ## Contraintes techniques
 
-- `options={"temperature": 0, "seed": 42}` sur **chaque** appel Ollama
-- Reponse JSON uniquement, nettoyage des balises markdown
-- OCR DocTR : acces via `data["pages"][idx]` = liste de tokens (jamais blocks/lines/words)
-- Convention nommage images : `_page0`, `_page1` (commence a 0)
+À respecter pour ne rien casser :
+
+- `options={"temperature": 0, "seed": 42}` sur **chaque** appel Ollama (déjà centralisé dans `core/config.OLLAMA_OPTIONS`).
+- OCR DocTR : `data["pages"][idx]` est une liste de tokens — **jamais** accéder via `blocks/lines/words` (ancien format).
+- Convention nommage images : `_page0`, `_page1` (commence à 0, jamais `_page_001`).
+- Réponse Gemma2 nettoyée via `core.postprocess.clean_json` pour retirer les balises markdown.
+- Les prompts sont YAML, validés par Pydantic au chargement (champ `prompt` obligatoire et non vide, `detecter` liste de strings).
+
+## État d'avancement
+
+Projet de stage Melko Energie, livré par paliers :
+
+| Chantier | Status | Valeur livrée |
+|---|---|---|
+| Refactor propre | ✅ | Séparation `core` / `api` / `scripts`, suppression du legacy Streamlit |
+| 1 — Externaliser les prompts | ✅ | Fichiers YAML, UI `/admin`, hot-reload, API CRUD |
+| 2 — Banc d'évaluation | ✅ | CLI + API, historique, diff A/B, normalisation dates/nombres |
+| 3 — Authentification | ⏳ | **Requis avant mise en production réseau** |
+| 4 — UI génération assistée | ✅ | `/admin-lab` + génération via Gemma2 + auto-test sur échantillons |
+| 5 — UI test d'un fournisseur | ✅ | `/eval-lab` avec historique, diff A/B, progression SSE |
+| 6 — Dashboard / rapports | ⏳ | Post-usage réel, quand données d'usage accumulées |
+
+## Limites connues (à retenir avant déploiement)
+
+- **Aucune authentification** : les pages `/admin`, `/admin-lab`, `/eval-lab` et tous les endpoints `/api/admin/*` ne sont protégés que par un check "localhost-only" côté serveur. Ce n'est **pas** de la sécurité — tout processus co-hébergé (container, second utilisateur) peut y accéder. À remplacer par une vraie authentification (chantier 3) avant toute exposition réseau.
+- **Aucune suite de tests automatisés** dans le repo : la vérification se fait manuellement via `scripts/extract_cli.py` et via le banc d'évaluation. Une suite pytest est à prévoir.
+- **Appels Ollama séquentiels** dans les batch et les évaluations : un lot de 100 PDFs prend ~15-20 min alors que Gemma2 sur RTX 5080 supporte 2-3 requêtes concurrentes. Optimisation via `ThreadPoolExecutor` possible pour diviser le temps par 3.
+- **L'auto-test du chantier 4.4** évalue le prompt généré sur **les mêmes échantillons qui ont servi à le produire** : l'accuracy affichée est un indicateur de cohérence, pas une vraie mesure de généralisation. Toujours vérifier ensuite sur des factures nouvelles via `/eval-lab`.
+- **Duplication `/admin` / `/admin-lab`** : les deux pages partagent le même backend mais ont chacune leur template et leur JS. À fusionner une fois les features lab stabilisées.
+- **Pas de versioning des prompts** côté UI : l'historique n'est accessible que via `git log`. Si un utilisateur casse un prompt, la récupération demande un développeur.
+- **Pas de rate limiting** sur les endpoints : protection à ajouter avant toute exposition.
+
+## Contributing
+
+1. Fork du dépôt
+2. Créer une branche feature : `git checkout -b feature/ma-feature`
+3. Commit : `git commit -m "feat: ma feature"`
+4. Push : `git push origin feature/ma-feature`
+5. Ouvrir une Pull Request
+
+## License
+
+Projet de stage — propriété intellectuelle Melko Energie. Aucune licence open source actuellement attachée.
 
 ---
 

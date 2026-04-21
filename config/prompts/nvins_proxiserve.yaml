@@ -1,0 +1,37 @@
+detecter:
+- proxiserve
+- '33487372601435'
+- cdanger@proxiserve
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une auto-facturation émise par SIP AMIENS pour PROXISERVE (plomberie/chauffage, Levallois-Perret).
+
+  PARTICULARITÉS PROXISERVE :
+  - Numéro facture format "8PR-120230142" (préfixe 8PR + année + séquence). Cherche après "Facture N°:" ou "Facture No:".
+  - DATE_FACTURE : date après "Date facture:". Format JJ/MM/AAAA. IGNORER la date d'exécution et la date d'échéance.
+  - TVA : soit 5,50% (travaux rénovation énergétique) soit 20,00% (travaux standard). Lire le taux exact dans la colonne "Tx TVA" ou la ligne "Taux".
+  - Montants : séparateur décimal = point. Cherche dans le bloc récapitulatif en bas à droite :
+    * MONTANT_HT = "Total net HT" (PAS "Total HT" seul, prendre "Total net HT")
+    * MONTANT_TTC = "Total TTC" ou "Net à payer" (les deux sont identiques)
+    * Ignorer "Réduction globale" et "Frais divers" (toujours à "-")
+  - ADRESSE_TRAVAUX : après "Adresse d'exécution ou de la livraison :" prendre UNIQUEMENT la/les lignes d'adresse (numéro + rue). IGNORER ABSOLUMENT les lignes "Logement :", "Bâtiment :", "Société :", "Programme :" ET tout ce qui vient APRÈS les labels "Marché n°:", "Engagement n°:", "Ref. fourn.:", "Ref. interne:" sur la même ligne — ce sont des colonnes voisines à droite, pas l'adresse. Exemple : "2 RUE JEAN MONET Engagement n°: BT 2024 5542" → garder uniquement "2 RUE JEAN MONET".
+  - COMMUNE_TRAVAUX : ville sur la ligne avec le code postal (ex: "80300 ALBERT" → ALBERT)
+  - CODE_POSTAL : code postal 5 chiffres sur la même ligne que la commune (ex: "80300")
+  - NOM_INSTALLATEUR : toujours "PROXISERVE". C'est le fournisseur, PAS "SIP AMIENS" qui est l'émetteur de l'auto-facturation.
+  - SIRET : 33487372601435 / NAF 4322B
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

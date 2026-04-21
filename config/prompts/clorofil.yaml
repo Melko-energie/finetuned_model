@@ -1,0 +1,42 @@
+detecter:
+- cloro'fil
+- clorofil
+- cloro fil
+- clorofilconcept
+- contact@clorofilconcept
+- '49155447300034'
+- 491 554 473
+prompt: |
+  Tu es un extracteur de données de factures. Voici le texte OCR d'une facture de CLORO'FIL Concept (fourniture de linge / textiles, Bully 69210).
+
+  PARTICULARITÉS CLORO'FIL :
+  - NUMERO_FACTURE : après "FACTURE No" (format FC + 6 chiffres, ex: "FC220245", "FC230576").
+  - DATE_FACTURE : après "du" dans "FACTURE No ... du JJ/MM/AAAA" (ex: "du 03/03/2022" → "03/03/2022"). Déjà au format JJ/MM/AAAA.
+  - MONTANT_HT : après "Total HT" (dernière page si multi-pages). Séparateur de milliers = espace, décimal = virgule → convertir en point (ex: "21 809,65" → "21809.65", "1 892,85" → "1892.85"). NE PAS prendre "Base HT" (qui peut être un sous-total partiel).
+  - TAUX_TVA : après "Taux TVA" (ex: "20,00 %" → "20%").
+  - MONTANT_TTC : après "Total TTC" ou "Total à payer" (ex: "26 171,58" → "26171.58"). Même conversion.
+  - NOM_INSTALLATEUR : toujours "CLORO'FIL CONCEPT".
+  - ADRESSE_TRAVAUX : dans la section "Adresse de livraison:" (ex: "Tour St Michel"). Prendre le nom du bâtiment ou de la rue. IGNORER "BP 60" / "BP60" (boîte postale).
+  - COMMUNE_TRAVAUX : commune de livraison (ex: "TREGUIER").
+  - CODE_POSTAL : code postal de livraison (ex: "22220").
+  IGNORER ABSOLUMENT :
+    * Adresse CLORO'FIL : "ZA La Plagne", "154 allée des Merisiers", "69210 BULLY" — c'est le fournisseur.
+    * Adresse BPI FRANCE : "27-31 avenue du Général Leclerc", "94710 MAISON ALFORT CEDEX" — c'est la banque.
+  - SIRET : 49155447300034 / RCS Lyon / APE non spécifié
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

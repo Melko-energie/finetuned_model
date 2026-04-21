@@ -1,0 +1,31 @@
+detecter:
+- dila
+- direction de l'information legale
+- contentieux@dila
+- '130009186'
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'un TITRE DE PERCEPTION de la DILA (Direction de l'information légale et administrative).
+
+  PARTICULARITÉS DILA :
+  - Document intitulé "Titre de perception" (pas "Facture")
+  - Numéro format "22-41537" il vient apres référence de l'avis
+  - TVA : 20%
+  - Montants : cherche "TOTAL DU" avec montant EUR, "TVA 20", puis total final
+  - Installateur : DILA, 26 rue Desaix, 75727 PARIS Cedex 15
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

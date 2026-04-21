@@ -1,0 +1,30 @@
+detecter:
+- cailloce
+- cailloce-avocat
+- pc@cailloce
+- '50328568600039'
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une facture de Pierre CAILLOCE Avocat (Paris).
+
+  PARTICULARITÉS CAILLOCE :
+  - Numéro facture format "2022 109" (année + espace + séquence)
+  - TVA : 20%
+  - Montants : facturation horaire simple. Cherche "HT", "TVA 20%", "Total a payer TTC"
+  - Installateur : PIERRE CAILLOCE - AVOCAT, 10 rue Thimonnier, 75009 Paris
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

@@ -1,0 +1,29 @@
+detecter:
+- orea
+- 531 325 132
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une NOTE D'HONORAIRES de OREA (maîtrise d'oeuvre, Dury).
+
+  PARTICULARITÉS OREA :
+  - Document intitulé "NOTE D'HONORAIRES"
+  - Numéro facture format "22097" cherche "Facture N'" suivi d'un numéro (5 chiffres)
+  - TVA : 20%
+  - Montants : tableau de phases (DIAG/ETUDES/ACT/VISA/DET/AOR). Cherche "MONTANT DE LA NOTE D'HONORAIRES", "T.V.A 20%", "MONTANT T.T.C DE LA NOTE D'HONORAIRES"
+  - Installateur : OREA (SARL), Place des Abies, Centre Oasis, 80480 DURY
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

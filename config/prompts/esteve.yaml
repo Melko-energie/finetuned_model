@@ -1,0 +1,31 @@
+detecter:
+- esteve
+- esteve-electricite
+- esteve electricite
+- 322 804 394
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une facture de ESTEVE ELECTRICITE (Amiens).
+
+  PARTICULARITÉS ESTEVE :
+  - Numéro facture format "22/09/0333" (AA/MM/NNNN)
+  - DATE_FACTURE : uniquement la date d'émission de la facture. Ignorer date d'échéance.
+  - TVA : 20%
+  - Montants : ligne items puis "Base HT / Taux TVA / Montant TVA / Montant T.T.C." puis "TOTAL TTC", "ACOMPTE", "NET A PAYER"
+  - Installateur : ESTEVE ELECTRICITE (SARL), 51 Rue de Sully, 80000 AMIENS
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, Form
+from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import io
@@ -10,12 +10,10 @@ from core.extraction import (
     extract_from_precomputed_ocr,
     extract_smart,
     process_file_live,
-    process_batch_zip,
-    iter_batch_zip,
-    export_excel_batch,
-    export_excel_multi_sheets,
     get_fournisseurs_list,
 )
+from core.batch import iter_batch_zip, process_batch_zip
+from core.excel import export_excel_batch, export_excel_multi_sheets
 
 router = APIRouter(prefix="/api")
 
@@ -94,3 +92,5 @@ async def api_export_excel_multi(data: ExportRequest):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=extraction_multi.xlsx"},
     )
+
+

@@ -1,0 +1,44 @@
+detecter:
+- arcana
+- arcana-architecture
+- arcana architecture
+- 753 191 980
+- '753191980'
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une NOTE D'HONORAIRES de ARCANA architecture (SARL d'Architecture, maîtrise d'œuvre, Amiens).
+
+  PARTICULARITÉS ARCANA :
+  - Document intitulé "NOTE D'HONORAIRES" (pas "Facture").
+  - NUMERO_FACTURE : après "No ARCANA" (préfixe ARCANA + 7-8 chiffres, ex: "ARCANA 2205864", "ARCANA 23101051", "ARCANA 2212924"). Garder le préfixe "ARCANA" dans le numéro.
+  - DATE_FACTURE : dans la ligne "Amiens le DD Mois AAAA" (ex: "Amiens le 18 Mai 2022" → "18/05/2022", "Amiens le 14 Décembre 2022" → "14/12/2022"). Convertir le mois en chiffre. Format JJ/MM/AAAA.
+  - MONTANT_HT : prendre "Acompte demandé HT" (PAS "TOTAL HT" qui est le montant global du marché, pas de cette note). Séparateur décimal = virgule → convertir en point (ex: "5450,97" → "5450.97").
+  - TAUX_TVA : toujours "20%" (l'OCR peut garbler "20%" en "12%" ou autre — ignorer, c'est toujours 20%).
+  - MONTANT_TTC : après "TTC" (ex: "6541,16" → "6541.16"). Virgule → point.
+  - NOM_INSTALLATEUR : toujours "ARCANA".
+  - ADRESSE_TRAVAUX : dans la ligne de description du marché après "MARCHE DE MAITRISE D'ŒUVRE -" ou "CONCEPTION REALISATION". Cette ligne contient la COMMUNE suivie de la RUE ou du QUARTIER puis la description des travaux. Extraire UNIQUEMENT la partie adresse (rue/quartier). Exemples :
+    * "AMIENS RUE BERANGER Transformation d'un bâtiment..." → ADRESSE_TRAVAUX = "RUE BERANGER"
+    * "AMIENS REHABILITATION ETOUVIE BAT E" → ADRESSE_TRAVAUX = "ETOUVIE" (quartier)
+  - COMMUNE_TRAVAUX : premier mot(s) de la ligne de description du marché = la commune (souvent "AMIENS"). NE PAS prendre "AMIENS CEDEX" du client SIP.
+  - CODE_POSTAL : souvent absent dans les notes ARCANA. Mettre null si non visible.
+  IGNORER ABSOLUMENT :
+    * Adresse client SIP : "13 PLACE D'AGUESSEAU", "80005 AMIENS CEDEX" — siège social, pas un chantier.
+    * Adresse ARCANA : "52 rue de l'Amiral Courbet", "80000 Amiens" — c'est l'architecte.
+    * Codes "BC 2023 ...", "2290/50" — références internes, pas des numéros de facture.
+  - SIRET : 753 191 980 / SARL d'Architecture
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

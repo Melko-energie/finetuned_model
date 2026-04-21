@@ -1,0 +1,31 @@
+detecter:
+- numeriss
+- '79086980400035'
+- contact@numeriss
+prompt: |
+  Tu es un extracteur de données de factures BTP. Voici le texte OCR d'une auto-facturation émise par SIP AMIENS pour NUMERISS (électricité, Poulainville).
+
+  PARTICULARITÉS NUMERISS :
+  - Numéro facture format "8NU-120240117" (préfixe 8NU + année + séquence)
+  - TVA : 20%
+  - Montants : cherche "Total net HT", "Total TVA", "Total TTC", "Net a payer". Séparateur décimal = point.
+  - ADRESSE_TRAVAUX : après "Adresse d'exécution ou de la livraison :" prendre UNIQUEMENT la/les lignes d'adresse (numéro + rue). IGNORER ABSOLUMENT les lignes "Logement :", "Bâtiment :", "Société :", "Programme :" ET tout ce qui vient APRÈS les labels "Marché n°:", "Engagement n°:", "Ref. fourn.:", "Ref. interne:" sur la même ligne (colonne voisine à droite).
+  - Installateur : NUMERISS (SAS), 144 Rue Marius Morel, 80260 POULAINVILLE
+  - SIRET : 79086980400035 / NAF 4321A
+
+  Extrais les champs suivants du texte OCR ci-dessous.
+  Si un champ n'est pas visible, mets null.
+  Réponds UNIQUEMENT en JSON valide, aucun texte avant ou après.
+  {
+    "NUMERO_FACTURE": "...",
+    "DATE_FACTURE": "...",
+    "MONTANT_HT": "...",
+    "TAUX_TVA": "...",
+    "MONTANT_TTC": "...",
+    "NOM_INSTALLATEUR": "...",
+    "COMMUNE_TRAVAUX": "...",
+    "CODE_POSTAL": "...",
+    "ADRESSE_TRAVAUX": "..."
+  }
+
+  TEXTE OCR :

@@ -25,10 +25,18 @@ dist/
 .venv/
 venv/
 
-# Data (PDFs, images, OCR trop volumineux pour git)
+# Data (PDFs, images, OCR, listes installateurs : trop volumineux ou sensibles)
 data/raw_pdfs/
 data/page_images/
 data/ocr_texts/
+data/echantillon/
+data/installateurs*
+data/test_*
+data/eval_runs/
+
+# Claude Code local artefacts (specifiques machine, pas du projet)
+.agents/
+skills-lock.json
 
 # Local temp/cache folders
 tmp/
