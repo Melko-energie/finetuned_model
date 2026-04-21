@@ -31,6 +31,12 @@
   const btnDownload = $("btn-download");
   const toast = $("toast");
 
+  // History (chantier 5.2)
+  const historySection = $("history-section");
+  const historyCount = $("history-count");
+  const historyTbody = $("history-tbody");
+  const btnRefreshHistory = $("btn-refresh-history");
+
   let toastTimer = null;
   function showToast(message, kind) {
     toast.textContent = message;
@@ -157,5 +163,88 @@
     results.classList.remove("hidden");
   }
 
-  form.addEventListener("submit", submitEval);
+  // ─── History (chantier 5.2) ───
+  async function refreshHistory() {
+    try {
+      const res = await fetch("/api/admin/eval/runs");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.json();
+      renderHistory(body.runs || []);
+    } catch (e) {
+      // History failures are non-blocking; just hide the section.
+      historySection.classList.add("hidden");
+    }
+  }
+
+  function renderHistory(runs) {
+    if (!runs || runs.length === 0) {
+      historySection.classList.add("hidden");
+      historyTbody.innerHTML = "";
+      historyCount.textContent = "";
+      return;
+    }
+    historyCount.textContent = `(${runs.length})`;
+    historyTbody.innerHTML = "";
+    for (const run of runs) {
+      const tr = document.createElement("tr");
+      tr.className = "border-b border-outline-variant/30 hover:bg-surface-container-low";
+      const started = (run.started_at || "").replace("T", " ").slice(0, 16);
+      const acc = run.accuracy_micro || 0;
+      const dataset = run.pdfs_dir || "";
+      const datasetShort = dataset.length > 34 ? "…" + dataset.slice(-33) : dataset;
+      const dur = Math.round(run.duration_seconds || 0);
+      const durStr = dur < 60 ? `${dur}s` : `${Math.floor(dur / 60)}m ${dur % 60}s`;
+      tr.innerHTML = `
+        <td class="py-2 pl-2 font-mono">${run.id}</td>
+        <td class="py-2 text-on-surface-variant">${started}</td>
+        <td class="py-2 text-on-surface-variant font-mono">${datasetShort}</td>
+        <td class="py-2 text-right font-bold ${accClass(acc)}">${(acc * 100).toFixed(1)}%</td>
+        <td class="py-2 text-right text-on-surface-variant">${durStr}</td>
+        <td class="py-2 pr-2 text-right">
+          <button type="button" class="text-primary hover:underline btn-view-run" data-run-id="${run.id}">Voir</button>
+        </td>
+      `;
+      historyTbody.appendChild(tr);
+    }
+    historySection.classList.remove("hidden");
+    for (const btn of historyTbody.querySelectorAll(".btn-view-run")) {
+      btn.addEventListener("click", () => viewRun(btn.dataset.runId));
+    }
+  }
+
+  async function viewRun(runId) {
+    btnRefreshHistory.disabled = true;
+    try {
+      const res = await fetch(`/api/admin/eval/runs/${encodeURIComponent(runId)}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const detail = (data && (data.detail || data.error)) || `HTTP ${res.status}`;
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      }
+      const result = await res.json();
+      renderResults({
+        run_id: runId,
+        result: result,
+        download_url: `/api/admin/eval/runs/${encodeURIComponent(runId)}/download`,
+      });
+      showToast(`Run '${runId}' chargé.`, "ok");
+      results.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (e) {
+      showToast(`Erreur chargement : ${e.message}`, "error");
+    } finally {
+      btnRefreshHistory.disabled = false;
+    }
+  }
+
+  btnRefreshHistory.addEventListener("click", refreshHistory);
+
+  // Single submit handler: run the eval, then refresh history so the new run
+  // appears at the top of the table.
+  form.addEventListener("submit", async (event) => {
+    await submitEval(event);
+    refreshHistory();
+  });
+
+  // Initial load
+  refreshHistory();
 })();
