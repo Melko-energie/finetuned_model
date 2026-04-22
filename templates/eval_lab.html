@@ -104,48 +104,104 @@
     <div id="progress-last" class="text-[11px] text-on-surface-variant font-mono truncate"></div>
   </div>
 
-  <!-- Results -->
-  <section id="results" class="hidden bg-white rounded-xl p-6 border border-outline-variant/50 space-y-6">
-    <!-- Meta -->
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-primary">verified</span>
-          <span class="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Run sauvegardé</span>
+  <!-- Results — redesigned dashboard -->
+  <section id="results" class="hidden space-y-6">
+
+    <!-- Hero card : run header + donut + quick stats -->
+    <div class="bg-white rounded-2xl p-6 border border-outline-variant/30 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">verified</span>
+            <span class="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Run sauvegardé</span>
+          </div>
+          <h3 id="run-id" class="font-headline text-2xl font-extrabold text-on-surface mt-1"></h3>
+          <p id="run-meta" class="text-xs text-on-surface-variant mt-1"></p>
         </div>
-        <h3 id="run-id" class="font-headline text-xl font-bold text-on-surface mt-1"></h3>
-        <p id="run-meta" class="text-xs text-on-surface-variant mt-1"></p>
+        <a id="btn-download" href="#" download class="bg-primary text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 shadow-sm hover:bg-primary-container transition-colors">
+          <span class="material-symbols-outlined text-sm">download</span>
+          Télécharger le rapport Excel
+        </a>
       </div>
-      <a id="btn-download" href="#" download class="bg-secondary-container text-on-secondary-fixed-variant px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 shadow-sm hover:bg-secondary-fixed transition-colors">
-        <span class="material-symbols-outlined text-sm">download</span>
-        Télécharger le rapport Excel
-      </a>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+        <!-- SVG donut for global micro -->
+        <div class="flex items-center gap-5">
+          <div class="relative w-32 h-32 flex-shrink-0">
+            <svg viewBox="0 0 120 120" class="w-32 h-32 -rotate-90">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="#e6e8ea" stroke-width="10"/>
+              <circle id="hero-donut-circle" cx="60" cy="60" r="52" fill="none"
+                      stroke="#003d9b" stroke-width="10" stroke-linecap="round"
+                      stroke-dasharray="326.7" stroke-dashoffset="326.7"
+                      class="transition-all duration-700 ease-out"/>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <div id="hero-pct" class="font-headline text-2xl font-extrabold leading-none">—</div>
+              <div class="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest mt-1">Global</div>
+            </div>
+          </div>
+          <div>
+            <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Accuracy micro</div>
+            <div class="text-xs text-on-surface mt-1">
+              <span id="hero-micro-detail" class="font-mono"></span>
+            </div>
+            <div class="text-[10px] text-on-surface-variant mt-2">
+              Pondérée par cellule. Reflet de la qualité opérationnelle.
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick stats grid -->
+        <div class="md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-surface-container-low rounded-lg p-3">
+            <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Macro</div>
+            <div id="stat-macro" class="font-headline text-2xl font-extrabold mt-1">—</div>
+            <div class="text-[10px] text-on-surface-variant">moyenne par champ</div>
+          </div>
+          <div class="bg-surface-container-low rounded-lg p-3">
+            <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">PDFs</div>
+            <div id="stat-matched" class="font-headline text-2xl font-extrabold mt-1">—</div>
+            <div id="stat-matched-detail" class="text-[10px] text-on-surface-variant">évalués</div>
+          </div>
+          <div class="bg-surface-container-low rounded-lg p-3">
+            <div class="text-[10px] font-bold text-[#2e7d32] uppercase tracking-widest">Champs OK</div>
+            <div id="stat-fields-ok" class="font-headline text-2xl font-extrabold text-[#2e7d32] mt-1">—</div>
+            <div class="text-[10px] text-on-surface-variant">≥ 90 %</div>
+          </div>
+          <div class="bg-surface-container-low rounded-lg p-3">
+            <div class="text-[10px] font-bold text-error uppercase tracking-widest">À revoir</div>
+            <div id="stat-fields-bad" class="font-headline text-2xl font-extrabold text-error mt-1">—</div>
+            <div class="text-[10px] text-on-surface-variant">&lt; 60 %</div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Global metrics -->
-    <div class="grid grid-cols-2 gap-4">
-      <div class="bg-surface-container-low rounded-lg p-4">
-        <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Accuracy globale (micro)</div>
-        <div id="global-micro" class="font-headline text-3xl font-extrabold mt-1"></div>
-        <div id="global-micro-detail" class="text-xs text-on-surface-variant mt-1"></div>
+    <!-- Insights (auto-generated callouts) -->
+    <div id="insights" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+
+    <!-- Per-field cards -->
+    <div class="bg-white rounded-2xl p-6 border border-outline-variant/30 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">view_list</span>
+          <h4 class="font-headline font-bold text-base text-on-surface">Détail par champ</h4>
+        </div>
+        <span class="text-[10px] text-on-surface-variant uppercase tracking-widest">Trié par accuracy ↓</span>
       </div>
-      <div class="bg-surface-container-low rounded-lg p-4">
-        <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Accuracy globale (macro)</div>
-        <div id="global-macro" class="font-headline text-3xl font-extrabold mt-1"></div>
-        <div class="text-xs text-on-surface-variant mt-1">moyenne des accuracies par champ</div>
-      </div>
+      <div id="per-field-cards" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
     </div>
 
-    <!-- Per-field -->
-    <div>
-      <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Par champ</div>
-      <div id="per-field-table" class="space-y-1 text-xs"></div>
-    </div>
-
-    <!-- Per-supplier -->
-    <div>
-      <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Par fournisseur (pires en premier)</div>
-      <div id="per-supplier-list" class="space-y-1 text-xs"></div>
+    <!-- Per-supplier rows -->
+    <div class="bg-white rounded-2xl p-6 border border-outline-variant/30 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">groups</span>
+          <h4 class="font-headline font-bold text-base text-on-surface">Par fournisseur</h4>
+        </div>
+        <span class="text-[10px] text-on-surface-variant uppercase tracking-widest">Pires en premier</span>
+      </div>
+      <div id="per-supplier-cards" class="space-y-2"></div>
     </div>
   </section>
 

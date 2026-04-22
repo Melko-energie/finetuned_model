@@ -23,13 +23,23 @@
   const results = $("results");
   const runId = $("run-id");
   const runMeta = $("run-meta");
-  const globalMicro = $("global-micro");
-  const globalMicroDetail = $("global-micro-detail");
-  const globalMacro = $("global-macro");
-  const perFieldTable = $("per-field-table");
-  const perSupplierList = $("per-supplier-list");
   const btnDownload = $("btn-download");
   const toast = $("toast");
+
+  // Hero card + insights + per-field/supplier cards (results redesign)
+  const heroPct = $("hero-pct");
+  const heroDonutCircle = $("hero-donut-circle");
+  const heroMicroDetail = $("hero-micro-detail");
+  const statMacro = $("stat-macro");
+  const statMatched = $("stat-matched");
+  const statMatchedDetail = $("stat-matched-detail");
+  const statFieldsOk = $("stat-fields-ok");
+  const statFieldsBad = $("stat-fields-bad");
+  const insightsContainer = $("insights");
+  const perFieldCards = $("per-field-cards");
+  const perSupplierCards = $("per-supplier-cards");
+  // Donut circle radius is 52 → circumference = 2π·52 ≈ 326.7
+  const DONUT_CIRC = 2 * Math.PI * 52;
 
   // SSE progress (chantier 5.4)
   const progressBar = $("progress-bar");
@@ -189,6 +199,31 @@
     }
   }
 
+  // ─── Results renderer (refonte design) ───
+
+  // Color/CSS helpers shared by the cards
+  function accBgClass(acc) {
+    if (acc >= 0.9) return "bg-[#2e7d32]";
+    if (acc >= 0.6) return "bg-[#e65100]";
+    return "bg-error";
+  }
+  function accBorderClass(acc) {
+    if (acc >= 0.9) return "border-l-[#2e7d32]";
+    if (acc >= 0.6) return "border-l-[#e65100]";
+    return "border-l-error";
+  }
+  function accDonutColor(acc) {
+    if (acc >= 0.9) return "#2e7d32";
+    if (acc >= 0.6) return "#e65100";
+    return "#ba1a1a";
+  }
+  function accLabel(acc) {
+    if (acc >= 0.9) return "excellent";
+    if (acc >= 0.75) return "bon";
+    if (acc >= 0.6) return "à améliorer";
+    return "critique";
+  }
+
   function renderResults(payload) {
     const result = payload.result;
     const meta = result.meta || {};
@@ -197,62 +232,209 @@
     const g = metrics.global || {};
     const bySupplier = result.metrics_by_supplier || {};
 
+    // ─── Header ───
     runId.textContent = payload.run_id;
-
-    const startedAt = (meta.started_at || "").replace("T", " ").slice(0, 19);
-    const durStr = meta.duration_seconds ? `${Math.round(meta.duration_seconds)}s` : "?";
+    const startedAt = (meta.started_at || "").replace("T", " ").slice(0, 16);
+    const durSec = Math.round(meta.duration_seconds || 0);
+    const durStr = durSec < 60 ? `${durSec}s` : `${Math.floor(durSec / 60)}m ${durSec % 60}s`;
     runMeta.textContent =
-      `${meta.matched || 0} PDFs évalués · ${meta.missing_on_disk || 0} manquant(s) sur disque · `
-      + `${meta.skipped_no_truth || 0} hors ground truth · modèle ${meta.model || "?"} · `
-      + `démarré ${startedAt} UTC · durée ${durStr}`;
+      `démarré ${startedAt} UTC · durée ${durStr} · modèle ${meta.model || "?"}`;
 
-    const microPct = (g.accuracy || 0) * 100;
-    const macroPct = (g.accuracy_macro || 0) * 100;
-    globalMicro.textContent = `${microPct.toFixed(1)}%`;
-    globalMicro.className = "font-headline text-3xl font-extrabold mt-1 " + accClass(g.accuracy || 0);
-    globalMicroDetail.textContent = `${g.match || 0} / ${g.total || 0} cellules correctes`;
-    globalMacro.textContent = `${macroPct.toFixed(1)}%`;
-    globalMacro.className = "font-headline text-3xl font-extrabold mt-1 " + accClass(g.accuracy_macro || 0);
+    // ─── Hero donut ───
+    const microAcc = g.accuracy || 0;
+    const microPct = microAcc * 100;
+    heroPct.textContent = `${microPct.toFixed(1)}%`;
+    heroPct.className = "font-headline text-2xl font-extrabold leading-none " + accClass(microAcc);
+    heroDonutCircle.style.strokeDashoffset = String(DONUT_CIRC * (1 - microAcc));
+    heroDonutCircle.style.stroke = accDonutColor(microAcc);
+    heroMicroDetail.textContent = `${g.match || 0} / ${g.total || 0} cellules correctes`;
 
-    perFieldTable.innerHTML = "";
-    for (const field of FIELD_KEYS) {
-      const c = perField[field] || {};
-      const acc = c.accuracy || 0;
-      const row = document.createElement("div");
-      row.className = "grid grid-cols-[1.2fr_auto_auto_auto] gap-3 items-center";
-      row.innerHTML = `
-        <span class="font-mono text-on-surface-variant">${field}</span>
-        <span class="font-mono ${accClass(acc)}">${renderBar(acc)}</span>
-        <span class="font-mono ${accClass(acc)}">${(acc * 100).toFixed(1)}%</span>
-        <span class="text-on-surface-variant/70">
-          (${c.match || 0} ok / ${c.mismatch || 0} mis / ${c.missing || 0} miss / ${c.unexpected || 0} unex)
-        </span>
-      `;
-      perFieldTable.appendChild(row);
+    // ─── Quick stats ───
+    const macroAcc = g.accuracy_macro || 0;
+    statMacro.textContent = `${(macroAcc * 100).toFixed(1)}%`;
+    statMacro.className = "font-headline text-2xl font-extrabold mt-1 " + accClass(macroAcc);
+
+    statMatched.textContent = String(meta.matched || 0);
+    const skipped = (meta.missing_on_disk || 0) + (meta.skipped_no_truth || 0);
+    statMatchedDetail.textContent = skipped > 0
+      ? `évalués · ${skipped} ignoré(s)`
+      : "évalués";
+
+    const fieldEntries = Object.entries(perField);
+    const okCount = fieldEntries.filter(([k, v]) => (v.accuracy || 0) >= 0.9).length;
+    const badCount = fieldEntries.filter(([k, v]) => (v.accuracy || 0) < 0.6).length;
+    statFieldsOk.textContent = String(okCount);
+    statFieldsBad.textContent = String(badCount);
+
+    // ─── Insights (auto-generated) ───
+    renderInsights(perField, bySupplier, microAcc);
+
+    // ─── Per-field cards (sorted DESC by accuracy) ───
+    perFieldCards.innerHTML = "";
+    const sortedFields = [...FIELD_KEYS].sort((a, b) => {
+      const aa = (perField[a] || {}).accuracy || 0;
+      const bb = (perField[b] || {}).accuracy || 0;
+      return bb - aa;
+    });
+    for (const field of sortedFields) {
+      perFieldCards.appendChild(renderFieldCard(field, perField[field] || {}));
     }
 
-    perSupplierList.innerHTML = "";
-    const sortedSuppliers = Object.keys(bySupplier).sort((a, b) => {
-      return (bySupplier[a].global.accuracy || 0) - (bySupplier[b].global.accuracy || 0);
-    });
+    // ─── Per-supplier rows (sorted ASC by accuracy = worst first) ───
+    perSupplierCards.innerHTML = "";
+    const sortedSuppliers = Object.keys(bySupplier).sort((a, b) =>
+      ((bySupplier[a].global || {}).accuracy || 0) - ((bySupplier[b].global || {}).accuracy || 0)
+    );
     for (const sup of sortedSuppliers) {
-      const m = bySupplier[sup];
-      const gg = m.global || {};
-      const acc = gg.accuracy || 0;
-      const row = document.createElement("div");
-      row.className = "grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center";
-      row.innerHTML = `
-        <span class="font-mono text-on-surface-variant">${sup}</span>
-        <span class="font-mono ${accClass(acc)}">${renderBar(acc)}</span>
-        <span class="font-mono ${accClass(acc)}">${(acc * 100).toFixed(1)}%</span>
-        <span class="text-on-surface-variant/70">(${m.n_pdfs || 0} PDFs, ${gg.match || 0}/${gg.total || 0} cells)</span>
-      `;
-      perSupplierList.appendChild(row);
+      perSupplierCards.appendChild(renderSupplierRow(sup, bySupplier[sup]));
     }
 
     btnDownload.href = payload.download_url || "#";
 
     results.classList.remove("hidden");
+  }
+
+  function renderInsights(perField, bySupplier, microAcc) {
+    insightsContainer.innerHTML = "";
+    const items = [];
+
+    // Best 3 fields
+    const sortedFieldsDesc = Object.entries(perField)
+      .sort(([, a], [, b]) => (b.accuracy || 0) - (a.accuracy || 0));
+    if (sortedFieldsDesc.length && (sortedFieldsDesc[0][1].accuracy || 0) >= 0.9) {
+      const top = sortedFieldsDesc.slice(0, 3).map(([k]) => k).join(", ");
+      items.push({
+        type: "good",
+        icon: "trending_up",
+        text: "Champs les plus fiables",
+        detail: top,
+      });
+    }
+
+    // Worst field
+    const sortedFieldsAsc = Object.entries(perField)
+      .sort(([, a], [, b]) => (a.accuracy || 0) - (b.accuracy || 0));
+    if (sortedFieldsAsc.length && (sortedFieldsAsc[0][1].accuracy || 0) < 0.6) {
+      const [worstField, worstStats] = sortedFieldsAsc[0];
+      items.push({
+        type: "bad",
+        icon: "priority_high",
+        text: `Champ à travailler : ${worstField}`,
+        detail: `${((worstStats.accuracy || 0) * 100).toFixed(1)} % seulement`,
+      });
+    }
+
+    // Worst supplier
+    const sortedSupAsc = Object.entries(bySupplier)
+      .sort(([, a], [, b]) => ((a.global || {}).accuracy || 0) - ((b.global || {}).accuracy || 0));
+    if (sortedSupAsc.length && ((sortedSupAsc[0][1].global || {}).accuracy || 0) < 0.6) {
+      const [worstSup, worstM] = sortedSupAsc[0];
+      items.push({
+        type: "bad",
+        icon: "factory",
+        text: `Fournisseur prioritaire : ${worstSup}`,
+        detail: `${((worstM.global.accuracy || 0) * 100).toFixed(1)} % sur ${worstM.n_pdfs || 0} PDFs`,
+      });
+    }
+
+    // Overall posture
+    if (microAcc >= 0.9) {
+      items.unshift({
+        type: "good",
+        icon: "check_circle",
+        text: "Très bonne qualité d'extraction",
+        detail: `${(microAcc * 100).toFixed(1)} % de cellules correctes — prêt pour usage`,
+      });
+    } else if (microAcc < 0.6) {
+      items.unshift({
+        type: "bad",
+        icon: "warning",
+        text: "Qualité globale insuffisante",
+        detail: "Vérifier les prompts des fournisseurs problématiques",
+      });
+    }
+
+    if (items.length === 0) {
+      insightsContainer.classList.add("hidden");
+      return;
+    }
+    insightsContainer.classList.remove("hidden");
+    for (const it of items) {
+      const div = document.createElement("div");
+      const palette = it.type === "good"
+        ? "border-l-[#2e7d32] bg-[#E6F4EA]/40"
+        : "border-l-error bg-[#FDE8E8]/40";
+      const iconColor = it.type === "good" ? "text-[#2e7d32]" : "text-error";
+      div.className = `rounded-xl p-4 border border-outline-variant/30 border-l-4 ${palette} flex items-start gap-3`;
+      div.innerHTML = `
+        <span class="material-symbols-outlined ${iconColor}">${it.icon}</span>
+        <div class="flex-1 min-w-0">
+          <div class="font-medium text-sm text-on-surface">${it.text}</div>
+          <div class="text-xs text-on-surface-variant mt-0.5">${it.detail}</div>
+        </div>
+      `;
+      insightsContainer.appendChild(div);
+    }
+  }
+
+  function renderFieldCard(field, c) {
+    const acc = c.accuracy || 0;
+    const pct = (acc * 100).toFixed(1);
+    const card = document.createElement("div");
+    card.className = `bg-surface-container-low rounded-xl p-4 border border-outline-variant/20 border-l-4 ${accBorderClass(acc)}`;
+
+    const chips = [];
+    if (c.match)      chips.push(`<span class="px-2 py-0.5 bg-[#E6F4EA] text-[#2e7d32] rounded font-medium">${c.match} OK</span>`);
+    if (c.mismatch)   chips.push(`<span class="px-2 py-0.5 bg-[#FDE8E8] text-error rounded font-medium">${c.mismatch} faux</span>`);
+    if (c.missing)    chips.push(`<span class="px-2 py-0.5 bg-[#FFE5CC] text-[#e65100] rounded font-medium">${c.missing} manquant</span>`);
+    if (c.unexpected) chips.push(`<span class="px-2 py-0.5 bg-[#FFF9C4] text-[#665900] rounded font-medium">${c.unexpected} inattendu</span>`);
+    if (chips.length === 0) chips.push(`<span class="text-on-surface-variant italic">aucune donnée</span>`);
+
+    card.innerHTML = `
+      <div class="flex items-center justify-between mb-2">
+        <span class="font-mono text-sm font-semibold text-on-surface">${field}</span>
+        <div class="flex items-baseline gap-2">
+          <span class="font-headline text-xl font-extrabold ${accClass(acc)}">${pct}%</span>
+          <span class="text-[10px] uppercase tracking-widest font-bold ${accClass(acc)}">${accLabel(acc)}</span>
+        </div>
+      </div>
+      <div class="w-full h-2 bg-white rounded-full overflow-hidden">
+        <div class="h-full ${accBgClass(acc)} rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+      </div>
+      <div class="flex flex-wrap gap-1.5 mt-2.5 text-[11px]">
+        ${chips.join("")}
+      </div>
+    `;
+    return card;
+  }
+
+  function renderSupplierRow(sup, m) {
+    const gg = m.global || {};
+    const acc = gg.accuracy || 0;
+    const pct = (acc * 100).toFixed(1);
+    const row = document.createElement("div");
+    row.className = "flex items-center gap-3 p-3 bg-surface-container-low rounded-xl";
+    row.innerHTML = `
+      <div class="w-1.5 h-12 rounded-full ${accBgClass(acc)} flex-shrink-0"></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="font-mono text-sm font-semibold text-on-surface truncate">${sup}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/60 text-on-surface-variant flex-shrink-0">
+              ${m.n_pdfs || 0} PDF${(m.n_pdfs || 0) > 1 ? "s" : ""}
+            </span>
+          </div>
+          <div class="flex items-baseline gap-2 flex-shrink-0">
+            <span class="font-headline text-lg font-extrabold ${accClass(acc)}">${pct}%</span>
+            <span class="text-[10px] text-on-surface-variant">${gg.match || 0}/${gg.total || 0}</span>
+          </div>
+        </div>
+        <div class="w-full h-1.5 bg-white rounded-full overflow-hidden">
+          <div class="h-full ${accBgClass(acc)} rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+        </div>
+      </div>
+    `;
+    return row;
   }
 
   // ─── History (chantier 5.2) ───
