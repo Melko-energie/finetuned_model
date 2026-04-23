@@ -66,17 +66,36 @@ cd finetuned_model
 
 # ↓ Tout-en-un : crée le venv, installe les dépendances, vérifie Ollama,
 #   télécharge le modèle si absent, lance le serveur sur le port 8001.
-make go
+python start.py
 ```
 
-Premier lancement : 3 à 5 minutes (téléchargement du modèle gemma2:9b si absent).
+Premier lancement : 3 à 5 minutes (téléchargement du modèle `gemma2:9b` si absent).
 Lancements suivants : ~5 secondes.
 
 Quand le serveur est lancé, ouvrir [http://127.0.0.1:8001](http://127.0.0.1:8001).
 
+`start.py` est un script Python pur, **cross-platform** (Windows / macOS / Linux), qui ne dépend que de Python lui-même — pas besoin de `make` ni d'autres outils externes.
+
+### Sous-commandes disponibles
+
+```bash
+python start.py --help            # liste toutes les commandes
+python start.py                   # ⭐ équivaut à 'go' : tout-en-un
+python start.py go                # idem, explicite
+python start.py install           # juste venv + dépendances Python
+python start.py check             # diagnostique Ollama + modèle dispo
+python start.py run               # lance uvicorn (suppose tout installé)
+python start.py ocr               # pipeline OCR : PDFs → PNG → JSON
+python start.py cli               # smoke test sur 3 factures de référence
+python start.py eval --pdfs <dir> --truth <truth.xlsx>   # banc d'éval CLI
+python start.py clean             # nettoie les caches __pycache__
+```
+
+Options globales : `--port 8002` pour changer le port d'écoute, `--model gemma3:latest` pour un autre modèle Ollama.
+
 ### Étape par étape (équivalent manuel)
 
-Si tu veux comprendre / contrôler chaque étape :
+Si tu veux comprendre / contrôler chaque étape sans passer par `start.py` :
 
 ```bash
 # 1. venv
@@ -93,22 +112,6 @@ ollama pull gemma2:9b
 # 4. Lancer le serveur
 uvicorn main:app --reload --port 8001 --app-dir server
 ```
-
-### Cibles Make disponibles
-
-```bash
-make help          # liste toutes les cibles
-make go            # ⭐ tout-en-un (setup + check + serveur)
-make install       # uniquement venv + dépendances Python
-make ollama-check  # vérifie qu'Ollama tourne et que le modèle est dispo
-make run           # lance le serveur (suppose tout déjà installé)
-make ocr           # pipeline OCR : PDFs → JSON DocTR
-make cli           # smoke test sur 3 factures de référence
-make eval PDFS=... TRUTH=...   # banc d'évaluation CLI
-make clean         # nettoie les caches __pycache__
-```
-
-Variables : `PORT=8002 make run` pour changer le port. `MODEL=gemma3:7b make ollama-check` pour un autre modèle.
 
 ## Configuration
 
@@ -294,7 +297,7 @@ finetuned_model/
 │   └── static/js/                     # JS client (app.js, admin.js, admin_lab.js, eval_lab.js)
 ├── assets/logo.png                    # Branding projet
 ├── docs/superpowers/specs/            # Specs de design par chantier
-├── Makefile
+├── start.py                           # Lanceur cross-platform (remplace Makefile)
 ├── requirements.txt
 └── README.md
 ```
