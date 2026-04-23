@@ -15,7 +15,7 @@ Conçue pour Melko Energie (gestion administrative de chantiers de rénovation �
 
 **Ce que le projet apporte de spécifique** :
 
-- **Les prompts vivent en dehors du code** dans `config/prompts/*.yaml` : ils sont éditables par le métier via une interface web `/admin` sans redéploiement.
+- **Les prompts vivent en dehors du code** dans `server/config/prompts/*.yaml` : ils sont éditables par le métier via une interface web `/admin` sans redéploiement.
 - **Un banc d'évaluation intégré** (CLI + API HTTP + UI `/eval-lab`) mesure objectivement la qualité d'extraction par champ et par fournisseur, compare deux runs pour détecter régressions et améliorations.
 - **Une UI expérimentale `/admin-lab`** permet de générer un nouveau prompt automatiquement à partir de 2-5 factures échantillons + un Excel de valeurs attendues (Gemma2 produit un brouillon, le métier relit et sauvegarde).
 
@@ -85,17 +85,18 @@ make install
 
 ## Configuration
 
-Aucune variable d'environnement requise. Tous les paramètres techniques sont centralisés dans **`core/config.py`** :
+Aucune variable d'environnement requise. Tous les paramètres techniques sont centralisés dans **`server/core/config.py`** :
 
-| Constante         | Valeur par défaut          | Rôle                                         |
-| ----------------- | -------------------------- | -------------------------------------------- |
-| `MODEL_NAME`      | `"gemma2:9b"`              | Modèle Ollama utilisé pour l'extraction      |
-| `OLLAMA_OPTIONS`  | `{temperature: 0, seed: 42}` | Déterminisme : indispensable à chaque appel  |
-| `OCR_DIR`         | `data/ocr_texts/`          | JSON DocTR pré-calculés                      |
-| `PDF_DIR`         | `data/raw_pdfs/`           | PDF source organisés par fournisseur         |
-| `ALL_FIELD_KEYS`  | 9 clés                     | Champs à extraire                            |
+| Constante         | Valeur par défaut             | Rôle                                         |
+| ----------------- | ----------------------------- | -------------------------------------------- |
+| `MODEL_NAME`      | `"gemma2:9b"`                 | Modèle Ollama utilisé pour l'extraction      |
+| `OLLAMA_OPTIONS`  | `{temperature: 0, seed: 42}`  | Déterminisme : indispensable à chaque appel  |
+| `SERVER_ROOT`     | `<repo>/server/`              | Racine du code Python                        |
+| `OCR_DIR`         | `server/data/ocr_texts/`      | JSON DocTR pré-calculés                      |
+| `PDF_DIR`         | `server/data/raw_pdfs/`       | PDF source organisés par fournisseur         |
+| `ALL_FIELD_KEYS`  | 9 clés                        | Champs à extraire                            |
 
-**Les prompts d'extraction** sont dans `config/prompts/*.yaml` (un fichier par fournisseur). Ils sont éditables :
+**Les prompts d'extraction** sont dans `server/config/prompts/*.yaml` (un fichier par fournisseur). Ils sont éditables :
 
 - Manuellement à la main, puis rechargés via `POST /api/admin/reload-prompts`.
 - Via l'interface web `/admin` qui fait l'édition + le reload automatiquement.
@@ -165,7 +166,7 @@ Mesure objective de la qualité d'extraction sur un lot de factures, à partir d
 3. Sauver sous `ground_truth.xlsx`.
 
 ```bash
-# Lancer une évaluation (sauvegardée automatiquement dans data/eval_runs/<timestamp>/)
+# Lancer une évaluation (sauvegardée automatiquement dans server/data/eval_runs/<timestamp>/)
 python server/scripts/run_eval.py run --pdfs server/data/echantillon --truth ground_truth.xlsx --excel rapport.xlsx
 
 # Lister les runs passés
@@ -308,7 +309,7 @@ make help      # Liste les cibles
 
 À respecter pour ne rien casser :
 
-- `options={"temperature": 0, "seed": 42}` sur **chaque** appel Ollama (déjà centralisé dans `core/config.OLLAMA_OPTIONS`).
+- `options={"temperature": 0, "seed": 42}` sur **chaque** appel Ollama (déjà centralisé dans `core.config.OLLAMA_OPTIONS`, fichier `server/core/config.py`).
 - OCR DocTR : `data["pages"][idx]` est une liste de tokens — **jamais** accéder via `blocks/lines/words` (ancien format).
 - Convention nommage images : `_page0`, `_page1` (commence à 0, jamais `_page_001`).
 - Réponse Gemma2 nettoyée via `core.postprocess.clean_json` pour retirer les balises markdown.
@@ -320,7 +321,7 @@ Projet de stage Melko Energie, livré par paliers :
 
 | Chantier | Status | Valeur livrée |
 |---|---|---|
-| Refactor propre | ✅ | Séparation `core` / `api` / `scripts`, suppression du legacy Streamlit |
+| Refactor propre + split `server/ui/` | ✅ | Séparation `server/core` / `server/api` / `server/scripts` + `ui/templates` + `ui/static`, suppression du legacy Streamlit |
 | 1 — Externaliser les prompts | ✅ | Fichiers YAML, UI `/admin`, hot-reload, API CRUD |
 | 2 — Banc d'évaluation | ✅ | CLI + API, historique, diff A/B, normalisation dates/nombres |
 | 3 — Authentification | ⏳ | **Requis avant mise en production réseau** |
