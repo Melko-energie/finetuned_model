@@ -95,7 +95,7 @@ Options globales : `--port 8002` pour changer le port d'écoute, `--model gemma3
 
 ### Via Docker (pour tests en équipe)
 
-Si tu veux faire essayer l'app à un collègue dev sans qu'il ait à toucher au venv Python, l'app est conteneurisée. Il aura besoin de :
+l'app est conteneurisée. Il aura besoin de :
 
 1. **Docker Desktop** (Windows/Mac) ou `docker` + `docker compose` (Linux)
 2. **Ollama Desktop** installé et lancé sur sa machine, avec le modèle pulled :
