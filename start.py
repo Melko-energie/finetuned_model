@@ -23,6 +23,7 @@ Variables :
 import argparse
 import platform
 import shutil
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -122,12 +123,40 @@ def cmd_check(model: str = DEFAULT_MODEL) -> None:
         print(f"  → Ollama OK + modèle {base} présent")
 
 
+def _is_port_free(port: int) -> bool:
+    """Renvoie True si on peut bind sur 127.0.0.1:port."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+
+
+def _find_free_port(start: int, attempts: int = 10) -> int | None:
+    """Cherche le premier port libre à partir de `start` (max `attempts` essais)."""
+    for offset in range(attempts):
+        if _is_port_free(start + offset):
+            return start + offset
+    return None
+
+
 def cmd_run(port: int = DEFAULT_PORT) -> None:
     """Lance uvicorn sur le port donné. Suppose tout déjà installé."""
     uvicorn = _venv_bin("uvicorn")
     if not uvicorn.is_file():
         print(f"❌ uvicorn introuvable dans {VENV.relative_to(ROOT)}.")
         print("   → Lance d'abord 'python start.py install'.")
+        sys.exit(1)
+
+    if not _is_port_free(port):
+        alternative = _find_free_port(port + 1)
+        print(f"❌ Le port {port} est déjà utilisé ou bloqué (réservé Windows, autre process…).")
+        if alternative:
+            print(f"   → Essaie : python start.py --port {alternative}")
+        else:
+            print(f"   → Aucun port libre trouvé entre {port} et {port + 10}.")
+            print(f"     Lance 'netstat -ano | findstr :{port}' pour identifier le coupable.")
         sys.exit(1)
 
     print(f"  → http://127.0.0.1:{port}")
