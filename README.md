@@ -56,32 +56,59 @@ L'interface FastAPI expose 7 pages :
 - **GPU recommandé** : NVIDIA avec >= 12 GB VRAM (testé sur RTX 5080 Laptop, 15.9 GB)
 - **OS** : Windows 11 (développé et testé). Les commandes shell ci-dessous fonctionnent sous Git Bash, WSL, macOS et Linux.
 
-## Installation
+## Installation et lancement
+
+### En une seule commande (recommandé)
 
 ```bash
-# 1. Cloner le repo
 git clone https://github.com/Melko-energie/finetuned_model.git
 cd finetuned_model
 
-# 2. Créer un environnement virtuel
-python -m venv venv
-# Windows (Git Bash) :
-source venv/Scripts/activate
-# macOS / Linux :
-# source venv/bin/activate
-
-# 3. Installer les dépendances Python
-pip install -r requirements.txt
-
-# 4. Télécharger le modèle Gemma2 dans Ollama
-ollama pull gemma2:9b
+# ↓ Tout-en-un : crée le venv, installe les dépendances, vérifie Ollama,
+#   télécharge le modèle si absent, lance le serveur sur le port 8001.
+make go
 ```
 
-Raccourci avec le `Makefile` (cf. section [Make](#make)) :
+Premier lancement : 3 à 5 minutes (téléchargement du modèle gemma2:9b si absent).
+Lancements suivants : ~5 secondes.
+
+Quand le serveur est lancé, ouvrir [http://127.0.0.1:8001](http://127.0.0.1:8001).
+
+### Étape par étape (équivalent manuel)
+
+Si tu veux comprendre / contrôler chaque étape :
 
 ```bash
-make install
+# 1. venv
+python -m venv venv
+source venv/Scripts/activate    # Windows Git Bash
+# source venv/bin/activate       # macOS / Linux
+
+# 2. dépendances Python
+pip install -r requirements.txt
+
+# 3. Modèle Ollama (à faire une seule fois)
+ollama pull gemma2:9b
+
+# 4. Lancer le serveur
+uvicorn main:app --reload --port 8001 --app-dir server
 ```
+
+### Cibles Make disponibles
+
+```bash
+make help          # liste toutes les cibles
+make go            # ⭐ tout-en-un (setup + check + serveur)
+make install       # uniquement venv + dépendances Python
+make ollama-check  # vérifie qu'Ollama tourne et que le modèle est dispo
+make run           # lance le serveur (suppose tout déjà installé)
+make ocr           # pipeline OCR : PDFs → JSON DocTR
+make cli           # smoke test sur 3 factures de référence
+make eval PDFS=... TRUTH=...   # banc d'évaluation CLI
+make clean         # nettoie les caches __pycache__
+```
+
+Variables : `PORT=8002 make run` pour changer le port. `MODEL=gemma3:7b make ollama-check` pour un autre modèle.
 
 ## Configuration
 
@@ -291,19 +318,6 @@ A2M, ARCANA, CAILLOCE, CLOROFIL, DILA, ECO2E, ESTEVE, EXIM, GAZ DE BORDEAUX, GAZ
 KLISZ, PROXISERVE, LOGISTA, L'UNION DES PEINTRES, SAS APPLI, TECHSOL, NUMERISS, SIP AMIENS (fallback).
 
 Plus un prompt `DEFAULT` déclenché pour tout fournisseur non reconnu.
-
-## Make
-
-Cibles disponibles (nécessite [`make`](https://www.gnu.org/software/make/) installé) :
-
-```bash
-make install   # Crée le venv et installe les dépendances
-make run       # Lance FastAPI sur le port 8001
-make ocr       # Pipeline OCR complet : pdf_to_images puis run_ocr
-make cli       # Smoke test extract_cli sur 3 PDFs
-make clean     # Supprime les caches __pycache__
-make help      # Liste les cibles
-```
 
 ## Contraintes techniques
 
