@@ -10,9 +10,12 @@ from api.routes import router as api_router
 
 app = FastAPI(title="Extraction de Factures BTP")
 
-BASE_DIR = Path(__file__).resolve().parent
-app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+# Templates and static assets live in the sibling ui/ directory after the
+# server/ui split (chantier 2026-04-23).
+SERVER_DIR = Path(__file__).resolve().parent       # <root>/server
+UI_DIR = SERVER_DIR.parent / "ui"                  # <root>/ui
+app.mount("/static", StaticFiles(directory=str(UI_DIR / "static")), name="static")
+templates = Jinja2Templates(directory=str(UI_DIR / "templates"))
 
 app.include_router(api_router)
 app.include_router(admin_router)

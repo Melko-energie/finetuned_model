@@ -105,14 +105,16 @@ Aucune variable d'environnement requise. Tous les paramètres techniques sont ce
 ### Interface web
 
 ```bash
-uvicorn main:app --reload
+uvicorn main:app --reload --app-dir server
 ```
 
 Ouvrir [http://127.0.0.1:8000](http://127.0.0.1:8000). Si le port est bloqué (Windows réserve parfois 8000) :
 
 ```bash
-uvicorn main:app --reload --port 8001
+uvicorn main:app --reload --app-dir server --port 8001
 ```
+
+Le `--app-dir server` indique à uvicorn d'aller chercher `main:app` dans le dossier `server/` (cf. [structure du projet](#structure-du-projet)).
 
 ### Édition des prompts par le métier
 
@@ -147,9 +149,9 @@ Ouvrir [/eval-lab](http://127.0.0.1:8001/eval-lab) :
 ### Pipeline OCR pour de nouvelles factures
 
 ```bash
-# Déposer les PDF dans data/raw_pdfs/<fournisseur>/
-python scripts/pdf_to_images.py   # PDF -> PNG (convention _page0, _page1…)
-python scripts/run_ocr.py         # PNG -> JSON DocTR dans data/ocr_texts/
+# Déposer les PDF dans server/data/raw_pdfs/<fournisseur>/
+python server/scripts/pdf_to_images.py   # PDF -> PNG (convention _page0, _page1…)
+python server/scripts/run_ocr.py         # PNG -> JSON DocTR dans server/data/ocr_texts/
 ```
 
 ### Banc d'évaluation
@@ -164,13 +166,13 @@ Mesure objective de la qualité d'extraction sur un lot de factures, à partir d
 
 ```bash
 # Lancer une évaluation (sauvegardée automatiquement dans data/eval_runs/<timestamp>/)
-python scripts/run_eval.py run --pdfs data/echantillon --truth ground_truth.xlsx --excel rapport.xlsx
+python server/scripts/run_eval.py run --pdfs server/data/echantillon --truth ground_truth.xlsx --excel rapport.xlsx
 
 # Lister les runs passés
-python scripts/run_eval.py list
+python server/scripts/run_eval.py list
 
 # Comparer deux runs (typiquement avant/après édition d'un prompt)
-python scripts/run_eval.py diff previous latest
+python server/scripts/run_eval.py diff previous latest
 ```
 
 Sortie terminal : accuracy par champ + globale, breakdown par fournisseur (pires en premier), barres ASCII. L'export Excel colore les cellules par verdict (match / mismatch / missing / unexpected).
@@ -211,61 +213,71 @@ curl http://127.0.0.1:8001/api/admin/eval/runs/<id_a>/diff/<id_b>
 
 Pas encore de suite de tests automatisés (chantier futur). La vérification de régression se fait via :
 
-- `python scripts/extract_cli.py` qui rejoue 3 factures de référence.
-- `python scripts/run_eval.py run --pdfs … --truth …` qui mesure la qualité sur un lot annoté + `diff previous latest` pour confirmer qu'un changement de prompt n'a pas régressé.
+- `python server/scripts/extract_cli.py` qui rejoue 3 factures de référence.
+- `python server/scripts/run_eval.py run --pdfs … --truth …` qui mesure la qualité sur un lot annoté + `diff previous latest` pour confirmer qu'un changement de prompt n'a pas régressé.
 
 ## Structure du projet
 
+L'arborescence suit la convention **server / ui** utilisée sur tous les projets Melko : tout le Python vit dans `server/`, tout ce qui est rendu visuel vit dans `ui/`. Quelqu'un qui ouvre le repo sait immédiatement où chercher.
+
 ```
 finetuned_model/
-├── main.py                      # Entrée FastAPI (routes des pages + montage des routers)
-├── api/
-│   ├── routes.py                # Endpoints publics /api/* (extraction, batch, exports)
-│   ├── admin.py                 # Endpoints admin /api/admin/* (CRUD prompts, reload, generate)
-│   └── admin_eval.py            # Endpoints admin /api/admin/eval/* (eval sync + SSE stream)
-├── core/                        # Logique métier pure (zéro dépendance web)
-│   ├── config.py                # Paths, MODEL_NAME, OLLAMA_OPTIONS, FIELDS
-│   ├── prompts.py               # Loader YAML + reload() hot-swap
-│   ├── detection.py             # detect_installateur, detect_avoir
-│   ├── ocr.py                   # DocTR singleton + JSON loader + live pipeline
-│   ├── postprocess.py           # clean_json, cohérence montants, blacklist SIP HQ
-│   ├── extraction.py            # 3 entry points + extraire_champs_with_prompt (inline)
-│   ├── batch.py                 # iter_batch_zip, process_batch_zip
-│   ├── excel.py                 # Exports Excel (single + multi-sheets)
-│   ├── prompt_gen.py            # Génération d'un brouillon de prompt via LLM (chantier 4)
-│   └── eval/                    # Banc d'évaluation
-│       ├── normalize.py         # Normalisation par champ (dates, nombres, accents)
-│       ├── dataset.py           # Load ground truth Excel + index PDFs
-│       ├── compare.py           # Verdicts match / mismatch / missing / unexpected
-│       ├── metrics.py           # Agrégation globale + par fournisseur
-│       ├── report.py            # Rendu terminal + dump JSON
-│       ├── excel_report.py      # Rapport XLSX coloré (Summary / Details / Per-Supplier)
-│       ├── history.py           # Sauvegarde et chargement des runs passés
-│       ├── diff.py              # Diff structuré entre deux runs
-│       └── runner.py            # iter_run_eval (SSE) + run_eval (wrapper sync)
-├── config/
-│   └── prompts/*.yaml           # 30 fournisseurs + texte.yaml + default.yaml
-├── templates/                   # Jinja2 (base, texte, smart, nouvelle, batch,
-│                                #         admin, admin_lab, eval_lab)
-├── static/js/                   # JS front (app.js, admin.js, admin_lab.js, eval_lab.js)
-├── scripts/
-│   ├── pdf_to_images.py         # PDF -> PNG
-│   ├── run_ocr.py               # PNG -> JSON DocTR
-│   ├── extract_cli.py           # Smoke test sur 3 PDFs
-│   └── run_eval.py              # CLI eval (run / list / diff)
-├── assets/logo.png
-├── data/                        # gitignore (PDF, images, OCR, eval runs, listes installateurs)
-│   ├── raw_pdfs/<fournisseur>/
-│   ├── page_images/
-│   ├── ocr_texts/
-│   └── eval_runs/<id>/result.json (+ report.xlsx)
-├── docs/superpowers/specs/      # Specs de design par chantier
+├── server/                            # Tout le Python (backend + données)
+│   ├── main.py                        # Entrée FastAPI (routes des pages + montage des routers)
+│   ├── api/
+│   │   ├── routes.py                  # Endpoints publics /api/* (extraction, batch, exports)
+│   │   ├── admin.py                   # Endpoints admin /api/admin/* (CRUD prompts, reload, generate)
+│   │   └── admin_eval.py              # Endpoints admin /api/admin/eval/* (eval sync + SSE stream)
+│   ├── core/                          # Logique métier pure (zéro dépendance web)
+│   │   ├── config.py                  # SERVER_ROOT, paths, MODEL_NAME, OLLAMA_OPTIONS, FIELDS
+│   │   ├── prompts.py                 # Loader YAML + reload() hot-swap
+│   │   ├── detection.py               # detect_installateur, detect_avoir
+│   │   ├── ocr.py                     # DocTR singleton + JSON loader + live pipeline
+│   │   ├── postprocess.py             # clean_json, cohérence montants, blacklist SIP HQ
+│   │   ├── extraction.py              # 3 entry points + extraire_champs_with_prompt (inline)
+│   │   ├── batch.py                   # iter_batch_zip, process_batch_zip
+│   │   ├── excel.py                   # Exports Excel (single + multi-sheets)
+│   │   ├── prompt_gen.py              # Génération d'un brouillon de prompt via LLM (chantier 4)
+│   │   └── eval/                      # Banc d'évaluation
+│   │       ├── normalize.py           # Normalisation par champ (dates, nombres, accents)
+│   │       ├── dataset.py             # Load ground truth Excel + index PDFs
+│   │       ├── compare.py             # Verdicts match / mismatch / missing / unexpected
+│   │       ├── metrics.py             # Agrégation globale + par fournisseur
+│   │       ├── report.py              # Rendu terminal + dump JSON
+│   │       ├── excel_report.py        # Rapport XLSX coloré (Summary / Details / Per-Supplier)
+│   │       ├── history.py             # Sauvegarde et chargement des runs passés
+│   │       ├── diff.py                # Diff structuré entre deux runs
+│   │       └── runner.py              # iter_run_eval (SSE) + run_eval (wrapper sync)
+│   ├── scripts/                       # CLIs one-shot
+│   │   ├── pdf_to_images.py           # PDF -> PNG
+│   │   ├── run_ocr.py                 # PNG -> JSON DocTR
+│   │   ├── extract_cli.py             # Smoke test sur 3 PDFs
+│   │   └── run_eval.py                # CLI eval (run / list / diff)
+│   ├── config/
+│   │   └── prompts/*.yaml             # 30 fournisseurs + texte.yaml + default.yaml
+│   └── data/                          # gitignored (PDF, images, OCR, eval runs, listes)
+│       ├── raw_pdfs/<fournisseur>/
+│       ├── page_images/
+│       ├── ocr_texts/
+│       └── eval_runs/<id>/result.json (+ report.xlsx)
+├── ui/                                # Tout ce qui est rendu visuel
+│   ├── templates/                     # Jinja2 (base, texte, smart, nouvelle, batch,
+│   │                                  #         admin, admin_lab, eval_lab)
+│   └── static/js/                     # JS client (app.js, admin.js, admin_lab.js, eval_lab.js)
+├── assets/logo.png                    # Branding projet
+├── docs/superpowers/specs/            # Specs de design par chantier
 ├── Makefile
 ├── requirements.txt
 └── README.md
 ```
 
-**Règle d'architecture** : `api/` et `scripts/` consomment `core/`. `core/` n'a aucune dépendance à FastAPI ni à l'écosystème web. Les endpoints admin (CRUD prompts + eval) sont isolés dans leurs propres fichiers pour garder `routes.py` focalisé sur l'extraction publique.
+**Règles d'architecture** :
+
+- `server/api/` et `server/scripts/` consomment `server/core/`. `server/core/` n'a aucune dépendance à FastAPI ni à l'écosystème web — testable en pur Python.
+- `ui/templates/` est rendu **côté serveur** par FastAPI (Jinja2). Les fichiers HTML ne sont pas des SPAs autonomes ; ils ont besoin du serveur pour être affichés.
+- `ui/static/js/` est le seul code qui s'exécute **réellement dans le navigateur** : appels REST vers `/api/*`, manipulation DOM, gestion d'état local.
+- Les endpoints admin (CRUD prompts + éval) sont isolés dans leurs propres fichiers pour garder `routes.py` focalisé sur l'extraction publique.
+- Pour démarrer le serveur : `uvicorn main:app --app-dir server` (le flag `--app-dir` indique à uvicorn d'aller chercher `main:app` dans le sous-dossier `server/`).
 
 ## Fournisseurs supportés (30 profils)
 
@@ -319,7 +331,7 @@ Projet de stage Melko Energie, livré par paliers :
 ## Limites connues (à retenir avant déploiement)
 
 - **Aucune authentification** : les pages `/admin`, `/admin-lab`, `/eval-lab` et tous les endpoints `/api/admin/*` ne sont protégés que par un check "localhost-only" côté serveur. Ce n'est **pas** de la sécurité — tout processus co-hébergé (container, second utilisateur) peut y accéder. À remplacer par une vraie authentification (chantier 3) avant toute exposition réseau.
-- **Aucune suite de tests automatisés** dans le repo : la vérification se fait manuellement via `scripts/extract_cli.py` et via le banc d'évaluation. Une suite pytest est à prévoir.
+- **Aucune suite de tests automatisés** dans le repo : la vérification se fait manuellement via `server/scripts/extract_cli.py` et via le banc d'évaluation. Une suite pytest est à prévoir.
 - **Appels Ollama séquentiels** dans les batch et les évaluations : un lot de 100 PDFs prend ~15-20 min alors que Gemma2 sur RTX 5080 supporte 2-3 requêtes concurrentes. Optimisation via `ThreadPoolExecutor` possible pour diviser le temps par 3.
 - **L'auto-test du chantier 4.4** évalue le prompt généré sur **les mêmes échantillons qui ont servi à le produire** : l'accuracy affichée est un indicateur de cohérence, pas une vraie mesure de généralisation. Toujours vérifier ensuite sur des factures nouvelles via `/eval-lab`.
 - **Duplication `/admin` / `/admin-lab`** : les deux pages partagent le même backend mais ont chacune leur template et leur JS. À fusionner une fois les features lab stabilisées.

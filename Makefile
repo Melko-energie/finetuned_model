@@ -16,14 +16,14 @@ install: ## Create venv and install Python dependencies
 	@echo "Done. Don't forget: ollama pull gemma2:9b"
 
 run: ## Launch the FastAPI app (PORT=8001 by default)
-	@$(UVICORN) main:app --reload --port $(PORT)
+	@$(UVICORN) main:app --reload --port $(PORT) --app-dir server
 
 ocr: ## Run OCR pipeline: PDF -> PNG -> JSON
-	@$(PYTHON) scripts/pdf_to_images.py
-	@$(PYTHON) scripts/run_ocr.py
+	@$(PYTHON) server/scripts/pdf_to_images.py
+	@$(PYTHON) server/scripts/run_ocr.py
 
 cli: ## Smoke test: extract 3 reference invoices
-	@$(PYTHON) scripts/extract_cli.py
+	@$(PYTHON) server/scripts/extract_cli.py
 
 clean: ## Remove __pycache__ directories
 	@find . -path ./venv -prune -o -type d -name '__pycache__' -print -exec rm -rf {} + 2>/dev/null || true

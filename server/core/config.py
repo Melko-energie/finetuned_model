@@ -1,9 +1,28 @@
-"""Project-wide configuration: paths, model, fields, JSON template."""
+"""Project-wide configuration: paths, model, fields, JSON template.
+
+Paths assume the new server/ui split:
+  <repo>/
+  ├── server/
+  │   ├── core/config.py   ← this file
+  │   ├── config/prompts/  ← YAML prompts
+  │   └── data/            ← runtime data (gitignored)
+  └── ui/
+      ├── templates/       ← Jinja2
+      └── static/          ← JS, CSS
+
+PROJECT_ROOT keeps its historical name but now points to the repo root
+(<root>), not the Python package root. SERVER_ROOT is the new alias for
+'<root>/server', where Python code, config and data live.
+"""
 
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
+# This file is at <root>/server/core/config.py
+# parent.parent       → <root>/server
+# parent.parent.parent → <root>
+SERVER_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = SERVER_ROOT.parent
+DATA_DIR = SERVER_ROOT / "data"
 OCR_DIR = DATA_DIR / "ocr_texts"
 PDF_DIR = DATA_DIR / "raw_pdfs"
 

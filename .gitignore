@@ -26,13 +26,9 @@ dist/
 venv/
 
 # Data (PDFs, images, OCR, listes installateurs : trop volumineux ou sensibles)
-data/raw_pdfs/
-data/page_images/
-data/ocr_texts/
-data/echantillon/
-data/installateurs*
-data/test_*
-data/eval_runs/
+# Couvre les anciens emplacements et les nouveaux après le split server/ui.
+server/data/
+data/
 
 # Claude Code local artefacts (specifiques machine, pas du projet)
 .agents/
