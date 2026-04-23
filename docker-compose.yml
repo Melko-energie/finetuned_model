@@ -1,0 +1,48 @@
+# docker-compose.yml — démarre l'app Extraction Factures BTP en container.
+#
+# Pré-requis sur la machine du testeur :
+#   1. Docker Desktop (Win/Mac) ou docker + docker compose plugin (Linux)
+#   2. Ollama Desktop installé et lancé (https://ollama.com)
+#      → ollama pull gemma2:9b (téléchargement de 5.4 GB, une seule fois)
+#
+# Démarrage :
+#   docker compose up               # lance l'app
+#   docker compose up --build       # rebuild si le code a changé
+#   docker compose down             # arrête + supprime le container
+#
+# Ouvrir ensuite http://localhost:8001
+
+services:
+  app:
+    build: .
+    image: melko-energie/finetuned_model:latest
+    container_name: extraction-factures-btp
+    restart: unless-stopped
+
+    ports:
+      - "8001:8001"
+
+    environment:
+      # Le client Python d'Ollama lit cette variable. host.docker.internal
+      # est l'alias DNS standard pour pointer sur l'hôte depuis un container
+      # (auto-géré par Docker Desktop sur Win/Mac, déclaré ci-dessous via
+      # extra_hosts pour Linux).
+      OLLAMA_HOST: http://host.docker.internal:11434
+      # Force UTF-8 pour les barres de progression et les noms de fournisseurs
+      # accentués dans les logs.
+      PYTHONIOENCODING: utf-8
+      PYTHONUNBUFFERED: "1"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      # Persiste les eval runs, les OCR pré-calculés, les listes
+      # installateurs, etc. → vivent sur l'hôte, survivent à
+      # docker compose down.
+      - ./server/data:/app/server/data
+
+      # Monte les prompts en lecture/écriture pour que les modifs
+      # faites via /admin (dans le container) atterrissent dans le repo
+      # de l'hôte. Permet aussi de versionner les évolutions par git.
+      - ./server/config/prompts:/app/server/config/prompts

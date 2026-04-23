@@ -1,0 +1,54 @@
+# Ce fichier dit à Docker quels dossiers/fichiers ignorer pendant le COPY.
+# Sans ça, l'image embarque venv/, les PDFs de test, les specs, etc. — soit
+# plusieurs gigas inutiles dans chaque layer.
+
+# Python local
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Données runtime (montées en volume par docker-compose, pas embarquées)
+server/data/
+data/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docs et specs (utiles dans le repo, inutiles dans l'image runtime)
+docs/
+
+# Caches d'outils
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Artefacts de session locale (Claude Code, lockfiles d'outils)
+.agents/
+.claude/
+skills-lock.json
+
+# Présentation PowerPoint (13 MB, n'a rien à faire dans l'image)
+*.pptx
+
+# Markdown principal (sera lu par les utilisateurs côté repo, pas runtime)
+README.md
+
+# Le launcher en pur Python est inutile dans le container : uvicorn est lancé
+# directement par CMD du Dockerfile.
+start.py
+
+# Fichiers de l'éditeur / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Fichiers Docker eux-mêmes
+Dockerfile
+docker-compose.yml
+.dockerignore

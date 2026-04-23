@@ -93,6 +93,40 @@ python start.py clean             # nettoie les caches __pycache__
 
 Options globales : `--port 8002` pour changer le port d'écoute, `--model gemma3:latest` pour un autre modèle Ollama.
 
+### Via Docker (pour tests en équipe)
+
+Si tu veux faire essayer l'app à un collègue dev sans qu'il ait à toucher au venv Python, l'app est conteneurisée. Il aura besoin de :
+
+1. **Docker Desktop** (Windows/Mac) ou `docker` + `docker compose` (Linux)
+2. **Ollama Desktop** installé et lancé sur sa machine, avec le modèle pulled :
+   ```bash
+   ollama pull gemma2:9b
+   ```
+
+Puis :
+
+```bash
+git clone https://github.com/Melko-energie/finetuned_model.git
+cd finetuned_model
+docker compose up
+```
+
+Premier `up` : ~6 min (build de l'image, ~9 GB avec torch + cuda toolchain).
+Ensuite : ~10 secondes au démarrage.
+
+Ouvrir [http://localhost:8001](http://localhost:8001).
+
+**Comment ça marche** : le container fait tourner FastAPI en isolé, mais se connecte à l'Ollama qui tourne sur la machine hôte (via `http://host.docker.internal:11434`). Avantages : pas besoin de GPU passthrough, le testeur garde son GPU local pour Ollama, et chacun peut tester sans interférer avec les autres.
+
+Les volumes montés (`server/data/`, `server/config/prompts/`) font que les runs d'éval, les prompts édités via `/admin`, etc. **persistent entre les redémarrages** et restent éditables depuis l'hôte avec un éditeur normal (VS Code, etc.) hors du container.
+
+```bash
+docker compose up                # démarre
+docker compose up --build        # rebuild après modif du code
+docker compose down              # arrête + supprime le container
+docker compose logs -f           # suit les logs
+```
+
 ### Étape par étape (équivalent manuel)
 
 Si tu veux comprendre / contrôler chaque étape sans passer par `start.py` :
@@ -297,7 +331,10 @@ finetuned_model/
 │   └── static/js/                     # JS client (app.js, admin.js, admin_lab.js, eval_lab.js)
 ├── assets/logo.png                    # Branding projet
 ├── docs/superpowers/specs/            # Specs de design par chantier
-├── start.py                           # Lanceur cross-platform (remplace Makefile)
+├── start.py                           # Lanceur cross-platform pour dev local
+├── Dockerfile                         # Image runtime (Python + deps + code)
+├── docker-compose.yml                 # Stack de test pour l'équipe
+├── .dockerignore                      # Exclut venv, data, docs des layers
 ├── requirements.txt
 └── README.md
 ```
